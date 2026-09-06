@@ -1,0 +1,62 @@
+{
+    "format_version": 2,
+    "header": {
+        "name": "Parkour Online BP",
+        "description": "-By TrayePlays",
+        "min_engine_version": [
+            1,
+            21,
+            0
+        ],
+        "uuid": "2ec4d9a3-d494-4881-bf37-1ee455f74d1d",
+        "version": [
+            1,
+            0,
+            0
+        ]
+    },
+    "modules": [
+        {
+            "type": "data",
+            "uuid": "842f380b-b39a-4679-a925-891657448950",
+            "version": [
+                1,
+                0,
+                0
+            ]
+        },
+        {
+            "type": "script",
+            "language": "javascript",
+            "uuid": "c6681b57-805d-45fc-a718-2bb5970c3f62",
+            "entry": "scripts/main.js",
+            "version": [
+                1,
+                0,
+                0
+            ]
+        }
+    ],
+    "dependencies": [
+        {
+            "module_name": "@minecraft/server",
+            "version": "beta"
+        },
+        {
+            "module_name": "@minecraft/server-gametest",
+            "version": "beta"
+        },
+        {
+            "module_name": "@minecraft/server-ui",
+            "version": "beta"
+        },
+        {
+            "module_name": "@minecraft/server-admin",
+            "version": "beta"
+        },
+        {
+            "module_name": "@minecraft/debug-utilities",
+            "version": "beta"
+        }
+    ]
+}
