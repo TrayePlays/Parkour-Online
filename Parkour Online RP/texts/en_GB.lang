@@ -1,0 +1,6 @@
+multiplayer.player.left=§8[§c-§8] §7%s
+multiplayer.player.joined=§8[§a+§8] §7%s
+notification.lock.noCraft=§cThis item can't be crafted with!
+notification.lock.noDrop=§cThis item can't be dropped!
+notification.lock.noRemove=§cThis item can't be removed!
+permissions.chatmute=§r§8[§dServer§8] §cYou are currently muted!
