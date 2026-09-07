@@ -3,8 +3,15 @@ import { CustomForm, ObservableBoolean, ObservableString } from "@minecraft/serv
 import { ServerStatusResponse } from "api";
 import { findAvailableDimension, loadDimension } from "build";
 import { dimensions } from "dimensions";
+import { Button, ButtonPanel } from "lib/elements/button";
+import { Grid } from "lib/elements/grid";
+import { Image } from "lib/elements/image";
+import { Label } from "lib/elements/label";
+import { PlayerRenderer } from "lib/elements/playerRenderer";
+import { Stacker } from "lib/elements/stacker";
+import { DynamicActionUI } from "lib/ui";
 import { api } from "main";
-import { createAccount, createLevel, deleteLevel, FirebaseResponse, getCurrentLevelName, getLevel, getLevelNames, isInsideLevelArea, Level, login, runSaveStructure, saveLevel, saveOnline, saveStructure, sleep } from "utils";
+import { createAccount, createLevel, deleteLevel, FirebaseResponse, getCurrentLevelName, getLevel, getLevelNames, isInsideLevelArea, Level, login, runSaveStructure, saveLevel, saveOnline, saveStructure, signIn, sleep } from "utils";
 
 async function signUpUI(player: Player) {
     if (player.persistentId == "") return player.sendMessage(`You have to sign in to sign in.`);
@@ -417,7 +424,7 @@ function levelMainUI(player: Player, levelName?: string) {
                 textField1.text.setData("");
                 toggle1.toggled.setData(false);
                 toggle1.vis.setData(false);
-                allButtonSet({vis: false, disabled: false});
+                allButtonSet({ vis: false, disabled: false });
             }
             const success = await login(player.name, password);
             if (success?.localId != undefined) {
@@ -514,13 +521,44 @@ function levelMainUI(player: Player, levelName?: string) {
     }
 }
 
+function scriptUI(player: Player) {
+    const form = new DynamicActionUI(300, 200, { body_texture: "textures/ui/greyBorder", header_texture: "textures/ui/greyBorder" }, { height: 40, width: 300 }, { x: 0, y: 0 }, { autoCenter: true })
+    form.title(new Label("Levels", { x: 0, y: 0 }, 3, "center", undefined, {fontType: "MinecraftTen"}));
+    form.grid(new Grid(
+        [
+            new Button(
+                new ButtonPanel({ x: 0, y: 0 }, { height: 32, width: 32 }),
+                undefined,
+                new Label("Hello world!", { x: 11, y: 32 }, 0.5, "center", 30),
+                () => {
+                    console.warn("clicked button!")
+                },
+                { buttonTextures: { default_texture: "textures/ui/button_borderless_dark", hover_texture: "textures/ui/button_borderless_darkhover" }, forceGlobalTextParent: true, hoverText: "Level 1" }
+            ),
+            new Button(
+                new ButtonPanel({ x: 0, y: 0 }, { height: 32, width: 32 }),
+                undefined,
+                new Label("Hello aaaaaa!", { x: 10 + 32, y: 32 }, 0.5, "center", 16),
+                () => {
+                    console.warn("clicked button!")
+                },
+                { buttonTextures: { default_texture: "textures/ui/classic-button", hover_texture: "textures/ui/classic-button-hover" }, forceGlobalTextParent: true, hoverText: "Level 2", }
+            ),
+        ],
+        { height: 1, width: 2 },
+        { height: 300, width: 64 },
+        { x: 10, y: 10 },
+    ))
+    form.show(player);
+}
+
 // Edit level ui 
 // (set name save delete with confirm em json ui maybe upload level)
 
 // Upload level ui 
 // (opens after u verify or you can open it with edit level if level is alr verified)
 
-world.afterEvents.itemUse.subscribe(({ itemStack, source: player }) => {
+world.afterEvents.itemUse.subscribe(async ({ itemStack, source: player }) => {
     if (itemStack.typeId == "minecraft:torch") {
         signUpUI(player);
     }
@@ -529,5 +567,15 @@ world.afterEvents.itemUse.subscribe(({ itemStack, source: player }) => {
     }
     if (itemStack.typeId == "minecraft:gold_nugget") {
         levelMainUI(player, getCurrentLevelName(player));
+    }
+    if (itemStack.typeId == "minecraft:copper_nugget") {
+        scriptUI(player);
+    }
+    if (itemStack.typeId == "minecraft:raw_gold") {
+        const data = await signIn(player);
+        if (data == undefined) return;
+        const json = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/level/Doohickey1788753137818.json?auth=${data.idToken}`, {}, undefined, undefined, (c, total) => {
+            console.warn(`${c} / ${total}`);
+        })
     }
 })

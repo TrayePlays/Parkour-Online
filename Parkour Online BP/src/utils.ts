@@ -527,7 +527,7 @@ interface LoginData {
     idToken: string
 }
 
-async function signIn(player: Player): Promise<LoginData | undefined> {
+export async function signIn(player: Player): Promise<LoginData | undefined> {
     const ping = await api.sendPingRequest();
     if (ping.status != ServerStatusResponse.Success) {
         player.sendMessage("You need to run /function connect")
