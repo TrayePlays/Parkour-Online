@@ -54,10 +54,15 @@ export interface Checkpoint {
     settings?: CheckpointSettings
 }
 
+export interface DeathZone {
+    locations: Vector3 | Vector3[]
+}
+
 export interface CustomLevelData {
     spawnLocation: Vector3;
     endLocation: Vector3;
     checkpoints?: Checkpoint[];
+    deathZones?: DeathZone[]
 }
 
 const a: CustomLevelData = {
@@ -109,6 +114,19 @@ export function formatTypeId(typeId: string) {
         }).join(" ");
         return formattedString;
     }
+}
+
+function getSelectionBounds(pos1: Vector3, pos2: Vector3, add = 0) {
+    return {
+        minX: Math.min(pos1.x, pos2.x),
+        maxX: Math.max(pos1.x, pos2.x) + add,
+
+        minY: Math.min(pos1.y, pos2.y),
+        maxY: Math.max(pos1.y, pos2.y) + add,
+
+        minZ: Math.min(pos1.z, pos2.z),
+        maxZ: Math.max(pos1.z, pos2.z) + add,
+    };
 }
 
 export function isInside(locationChecking: Vector3, locations: Vector3[]) {
@@ -295,19 +313,6 @@ export function getLevel(name: string): Level | undefined {
     try {
         return JSON.parse(levelDataDecompressed) as Level;
     } catch { };
-}
-
-export function getSelectionBounds(pos1: Vector3, pos2: Vector3, add = 0) {
-    return {
-        minX: Math.min(pos1.x, pos2.x),
-        maxX: Math.max(pos1.x, pos2.x) + add,
-
-        minY: Math.min(pos1.y, pos2.y),
-        maxY: Math.max(pos1.y, pos2.y) + add,
-
-        minZ: Math.min(pos1.z, pos2.z),
-        maxZ: Math.max(pos1.z, pos2.z) + add,
-    };
 }
 
 export function getBlockKey(block: Block): string {

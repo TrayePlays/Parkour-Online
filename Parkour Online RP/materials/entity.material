@@ -1,0 +1,55 @@
+{
+    "materials": {
+        "version": "1.0.0",
+        "custom_transparent:entity": {
+            "+states": [
+                "Blending",
+                "DisableCulling",
+                "DisableDepthWrite",
+                "DisableAlphaWrite"
+            ],
+            "blendSrc": "SourceAlpha",
+            "blendDst": "OneMinusSrcAlpha",
+            "vertexFields": [
+                {
+                    "field": "Position"
+                },
+                {
+                    "field": "Color"
+                },
+                {
+                    "field": "Normal"
+                },
+                {
+                    "field": "UV0"
+                }
+            ],
+            "variants": [
+                {
+                    "skinning": {
+                        "+defines": [
+                            "USE_SKINNING"
+                        ],
+                        "vertexFields": [
+                            {
+                                "field": "Position"
+                            },
+                            {
+                                "field": "BoneId0"
+                            },
+                            {
+                                "field": "Color"
+                            },
+                            {
+                                "field": "Normal"
+                            },
+                            {
+                                "field": "UV0"
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+}

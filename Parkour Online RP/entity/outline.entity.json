@@ -1,0 +1,25 @@
+{
+    "format_version": "1.10.0",
+    "minecraft:client_entity": {
+        "description": {
+            "identifier": "parkour:outline",
+            "geometry": {
+                "default": "geometry.outline_grid",
+                "outline": "geometry.outline"
+            },
+            "textures": {
+                "default": "textures/game/white"
+            },
+            "materials": {
+                "default": "entity_alphatest",
+                "outline": "entity_beam_additive"
+            },
+            "scripts": {
+                "scalex": "q.property('parkour:size_x')",
+                "scaley": "q.property('parkour:size_y')",
+                "scalez": "q.property('parkour:size_z')"
+            },
+            "render_controllers": ["controller.render.outline", "controller.render.outline_base"]
+        }
+    }
+}

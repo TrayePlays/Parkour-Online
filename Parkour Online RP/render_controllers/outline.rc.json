@@ -1,0 +1,29 @@
+{
+    "format_version": "1.10.0",
+    "render_controllers": {
+        "controller.render.outline_base": {
+            "geometry": "geometry.default",
+            "materials": [
+                {
+                    "*": "material.default"
+                }
+            ],
+            "textures": ["texture.default"]
+        },
+        "controller.render.outline": {
+            "geometry": "geometry.outline",
+            "materials": [
+                {
+                    "*": "material.outline"
+                }
+            ],
+            "overlay_color": {
+                "r": "q.property('parkour:red')",
+                "g": "q.property('parkour:green')",
+                "b": "q.property('parkour:blue')",
+                "a": "q.property('parkour:alpha')"
+            },
+            "textures": ["texture.default"]
+        }
+    }
+}
