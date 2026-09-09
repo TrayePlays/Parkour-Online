@@ -1,0 +1,25 @@
+{
+    "format_version": "1.26.40",
+    "minecraft:crafting_items_catalog": {
+        "categories": [
+            {
+                "category_name": "items",
+                "groups": [
+                    {
+                        "group_identifier": {
+                            "icon": "parkour:checkpoint",
+                            "name": "parkour:itemGroup.name.parkour"
+                        },
+                        "items": [
+                            "parkour:spawn",
+                            "parkour:finish",
+                            "parkour:checkpoint",
+                            "parkour:death",
+                            "parkour:settings"
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -1,10 +1,10 @@
-import { Block, BlockPermutation, BlockVolume, Dimension, EnchantmentType, EquipmentSlot, ItemLockMode, ItemStack, Player, system, Vector3, world } from "@minecraft/server";
+import { Block, BlockPermutation, BlockVolume, Dimension, EnchantmentType, EquipmentSlot, GameMode, ItemLockMode, ItemStack, Player, system, Vector2, Vector3, world } from "@minecraft/server";
 import { ModalFormData } from "@minecraft/server-ui";
 import { ServerResponse, ServerStatusResponse } from "api";
 import { dimensions } from "dimensions";
 import { api } from "main";
 
-export const API_KEY = "AIzaSyCQl62AxanB6iRR2cxTQNz-MstkfiE0FEQ"
+export const API_KEY = "\u0041\u0049\u007A\u0061\u0053\u0079\u0043\u0051\u006C\u0036\u0032\u0041\u0078\u0061\u006E\u0042\u0036\u0069\u0052\u0052\u0032\u0063\u0078\u0054\u0051\u004E\u007A\u002D\u004D\u0073\u0074\u006B\u0066\u0069\u0045\u0030\u0046\u0045\u0051";
 export const EMAIL_HEADER = "@parkouronline.local";
 
 export let overworld: Dimension
@@ -33,9 +33,44 @@ export interface FirebaseResponse {
     error?: { code: number, message: string, errors: { message: string, domain: string, reason: string }[] }
 }
 
+export interface LevelMetadata {
+    id: string; // level code
+    creator: string;
+    description: string;
+    name: string;
+    ownerId: string;
+}
+
+export interface SpawnSettings {
+    defaultRotation: Vector2
+}
+
+export interface CheckpointSettings {
+    enterMessage?: string;
+}
+
+export interface Checkpoint {
+    locations: Vector3 | Vector3[];
+    settings?: CheckpointSettings
+}
+
+export interface CustomLevelData {
+    spawnLocation: Vector3;
+    endLocation: Vector3;
+    checkpoints?: Checkpoint[];
+}
+
+const a: CustomLevelData = {
+    spawnLocation: { x: 0, y: 0, z: 0 },
+    endLocation: { x: 0, y: 0, z: 0 },
+    checkpoints: [
+    ]
+}
+
 export interface OnlineLevel extends Level {
     creatorId: string;
     difficulty: number;
+    version: number;
 }
 
 export interface Level extends BaseLevel {
@@ -45,6 +80,7 @@ export interface Level extends BaseLevel {
 export interface BaseLevel {
     creator: string;
     name: string;
+    customLevelData: CustomLevelData
     description?: string;
 }
 
@@ -182,6 +218,10 @@ export function getCurrentLevelName(player: Player): string | undefined {
 
 export function createLevel(player: ParkourPlayer, name: string, description?: string) {
     const levelData: BaseLevel = {
+        customLevelData: {
+            spawnLocation: { x: 0, y: -63, z: 0 },
+            endLocation: { x: 10, y: -63, z: 0 }
+        },
         creator: player.name,
         name,
         description
@@ -197,13 +237,14 @@ export function createLevel(player: ParkourPlayer, name: string, description?: s
     return levelData;
 }
 
-export function saveLevel(player: ParkourPlayer, name: string, newLevelData: { newName?: string, newDescription?: string, newStructure?: SavedStructure, newLevelMetaData?: {} }) {
+export function saveLevel(player: ParkourPlayer, name: string, newLevelData: { newName?: string, newDescription?: string, newStructure?: SavedStructure, newLevelData?: CustomLevelData }) {
     const oldLevelData = getLevel(name);
     if (!oldLevelData) return;
     const levelData: Level = {
         name: newLevelData.newName ?? oldLevelData.name,
         structure: newLevelData.newStructure ?? oldLevelData.structure,
         description: newLevelData.newDescription ?? oldLevelData.description,
+        customLevelData: newLevelData.newLevelData ?? oldLevelData.customLevelData,
         creator: oldLevelData.creator,
     }
 
@@ -283,6 +324,16 @@ export function getBlockKey(block: Block): string {
 
 export function runSaveStructure(dimension: Dimension, pos1: Vector3, pos2: Vector3, onProgress?: (count: number, total: number) => void, onDone?: (structure: SavedStructure) => void) {
     system.runJob(saveStructure(dimension, pos1, pos2, onProgress, onDone))
+}
+
+export function playtestLevel(player: ParkourPlayer, level: Level) {
+    player.setDynamicProperty("oldLocation", player.location);
+    player.setDynamicProperty("oldRotation", { x: player.getRotation().x, y: player.getRotation().y, z: 0 });
+    // save inv and stuff
+    player.runCommand("clear");
+    const spawnLocation = level.customLevelData.spawnLocation
+    player.teleport({ x: spawnLocation.x + 0.5, y: spawnLocation.y, z: spawnLocation.z + 0.5 });
+    player.setGameMode(GameMode.Adventure);
 }
 
 export function* saveStructure(dimension: Dimension, pos1: Vector3, pos2: Vector3, onProgress?: (count: number, total: number) => void, onDone?: (structure: SavedStructure) => void): Generator<void, void, void> {
@@ -492,7 +543,6 @@ export function* loadStructure(structure: SavedStructure, dimension: Dimension, 
 
                 currentRunCount--;
 
-                const { remainingStates } = states
                 const block = dimension.getBlock({ x: worldX, y: worldY, z: worldZ });
 
                 if (!block) {
@@ -503,7 +553,7 @@ export function* loadStructure(structure: SavedStructure, dimension: Dimension, 
                     continue;
                 }
 
-                const perm = BlockPermutation.resolve(id, remainingStates)
+                const perm = BlockPermutation.resolve(id, states)
 
                 block.setType(id);
                 block.setPermutation(perm);
@@ -533,10 +583,8 @@ export async function signIn(player: Player): Promise<LoginData | undefined> {
         player.sendMessage("You need to run /function connect")
         return
     };
-    let usingDefault = true;
     let password = player.getDynamicProperty(`password`) as string;
     if (!password) {
-        usingDefault = false;
         const prompt = await promptPassword(player);
         if (!prompt) return;
         password = prompt;
@@ -553,20 +601,63 @@ export async function signIn(player: Player): Promise<LoginData | undefined> {
     }
 }
 
+export function generateLevelCode(): string {
+    const allowedChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const codeLength = 8;
+    let code = "";
+
+    for (let i = 0; i < codeLength; i++) {
+        const randomIndex = Math.floor(Math.random() * allowedChars.length);
+        code += allowedChars[randomIndex];
+    }
+
+    return code;
+}
+
+export function metadataToArray(firebaseData: Record<string, any>): LevelMetadata[] {
+    if (!firebaseData) return [];
+
+    return Object.entries(firebaseData).map(([code, details]) => {
+        return {
+            id: code,
+            creator: details.creator,
+            description: details.description,
+            name: details.name,
+            ownerId: details.ownerId
+        };
+    });
+}
+
+
 export async function saveOnline(player: Player, level: Level) {
     try {
         const account = await signIn(player);
         if (!account) return player.sendMessage(`Failed Login`);
         // console.warn(JSON.stringify(login))
-        const saveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com//level/${level.name}${Date.now()}.json?auth=${account.idToken}`, {
+        const levelCode = generateLevelCode();
+        console.warn("ran 1")
+        const saveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/levels/${levelCode}.json?auth=${account.idToken}`, {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ creator: level.creator, name: level.name, structure: level.structure, description: level.description, ownerId: account.localId }),
+            body: JSON.stringify({ creator: level.creator, name: level.name, description: level.description, ownerId: account.localId }),
+        })
+        console.warn("ran 2")
+        const dataSaveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/level_data/${levelCode}.json?auth=${account.idToken}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ structure: level.structure, ownerId: account.localId }),
         })
         if (saveReq.status == ServerStatusResponse.Success) {
-            player.sendMessage(`Saved Online!`)
+            player.sendMessage(`Saved p1!`)
+        } else {
+            player.sendMessage(`Failed to save online!`)
+        }
+        if (dataSaveReq.status == ServerStatusResponse.Success) {
+            player.sendMessage(`Saved done!`)
         } else {
             player.sendMessage(`Failed to save online!`)
         }

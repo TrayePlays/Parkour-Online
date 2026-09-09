@@ -247,7 +247,7 @@ export class DynamicActionUI {
 
         if (buttons.length !== dimensions.width * dimensions.height) {
             throw new Error('Amount of buttons doesnt match grid dimensions');
-        }
+        };
 
         const dx = (w ?? this.width) / width;
         const dy = (h ?? this.height) / height;

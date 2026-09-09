@@ -1,0 +1,21 @@
+{
+    "resource_pack_name": "Parkour Online RP",
+    "texture_name": "atlas.items",
+    "texture_data": {
+        "finish": {
+            "textures": "textures/blocks/finish"
+        },
+        "spawn": {
+            "textures": "textures/blocks/spawn"
+        },
+        "checkpoint": {
+            "textures": "textures/blocks/checkpoint"
+        },
+        "death": {
+            "textures": "textures/blocks/death"
+        },
+        "settings": {
+            "textures": "textures/items/settings"
+        }
+    }
+}

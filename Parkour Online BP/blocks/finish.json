@@ -1,0 +1,26 @@
+// mc-disable resourcepack.models.missing
+// mc-disable behaviorpack.block.components.texture_not_found
+{
+    "format_version": "1.26.0",
+    "minecraft:block": {
+        "description": {
+            "identifier": "parkour:finish"
+        },
+        "components": {
+            "minecraft:geometry": "geometry.invis",
+            "minecraft:material_instances": {
+                "*": {}
+            },
+            "minecraft:connection_rule": {
+                "accepts_connections_from": "none"
+            },
+            "minecraft:collision_box": false,
+            "minecraft:destruction_particles": {
+                "particle_count": 0
+            },
+            "minecraft:destructible_by_mining": {
+                "seconds_to_destroy": 0
+            }
+        }
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "format_version": "1.26.0",
+    "minecraft:item": {
+        "description": {
+            "identifier": "parkour:death",
+            "menu_category": {
+                "category": "items",
+                "group": "parkour:itemGroup.name.parkour"
+            }
+        },
+        "components": {
+            "minecraft:block_placer": {
+                "block": "parkour:death",
+                "replace_block_item": true
+            },
+            "minecraft:display_name": {
+                "value": "Death"
+            },
+            "minecraft:icon": {
+                "textures": {
+                    "default": "death"
+                }
+            }
+        }
+    }
+}

@@ -2,6 +2,8 @@ import { world, system } from "@minecraft/server"
 import { HivemindAPI } from "api.js";
 
 import "./commands.js"
+import "./level.js"
+import "./specialItems.js"
 import "./ui.js"
 
 export const api = new HivemindAPI("ParkourOnline", { onConnect: onConnect });

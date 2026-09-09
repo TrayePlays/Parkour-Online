@@ -48,21 +48,19 @@ export async function loadDimension(player: Player, dim: CustomDimension, level?
     await world.tickingAreaManager.createTickingArea(`${dim.typeId}_load`, { dimension: dimension, from: { x: 0, y: -64, z: 0 }, to: { x: 0, y: -64, z: 0 } });
     dimension.setBlockType({ x: 0, y: -64, z: 0 }, "bedrock");
     world.tickingAreaManager.removeTickingArea(`${dim.typeId}_load`);
+    if (level && level.name) {
+        player.setDynamicProperty("currentLevel", level.name)
+    }
     if (level && level.structure) {
         runLoadStructure(level.structure, dimension, { x: -32, y: -64, z: -32 }, () => {
-            player.camera.clear()
-            console.warn("on load?")
-            player.teleport({ x: 0.5, y: -63, z: 0.5 }, { dimension });
+            const spawnLocation = level.customLevelData.spawnLocation;
+            player.teleport({ x: spawnLocation.x + 0.5, y: spawnLocation.y, z: spawnLocation.z + 0.5 }, { dimension });
             checkIfUsingDimensions();
         })
         return;
     }
-    if (level && level.name) {
-        player.setDynamicProperty("currentLevel", level.name)
-    }
     player.teleport({ x: 0.5, y: -63, z: 0.5 }, { dimension });
     checkIfUsingDimensions();
-    console.warn(JSON.stringify(dimensions));
 }
 
 world.beforeEvents.playerPlaceBlock.subscribe((data) => {

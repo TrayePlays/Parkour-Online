@@ -1,0 +1,22 @@
+{
+    "format_version": "1.26.0",
+    "minecraft:item": {
+        "description": {
+            "identifier": "parkour:settings",
+            "menu_category": {
+                "category": "items",
+                "group": "parkour:itemGroup.name.parkour"
+            }
+        },
+        "components": {
+            "minecraft:display_name": {
+                "value": "Settings"
+            },
+            "minecraft:icon": {
+                "textures": {
+                    "default": "settings"
+                }
+            }
+        }
+    }
+}

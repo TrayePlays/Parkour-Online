@@ -1,5 +1,5 @@
-import { Player, system, world } from "@minecraft/server";
-import { CustomForm, ObservableBoolean, ObservableString } from "@minecraft/server-ui"
+import { BlockPermutation, MolangVariableMap, Player, system, world } from "@minecraft/server";
+import { ActionFormData, CustomForm, ObservableBoolean, ObservableString } from "@minecraft/server-ui"
 import { ServerStatusResponse } from "api";
 import { findAvailableDimension, loadDimension } from "build";
 import { dimensions } from "dimensions";
@@ -8,10 +8,12 @@ import { Grid } from "lib/elements/grid";
 import { Image } from "lib/elements/image";
 import { Label } from "lib/elements/label";
 import { PlayerRenderer } from "lib/elements/playerRenderer";
+import { ScrollingPanel } from "lib/elements/singles/scrollingPanel";
 import { Stacker } from "lib/elements/stacker";
 import { DynamicActionUI } from "lib/ui";
 import { api } from "main";
-import { createAccount, createLevel, deleteLevel, FirebaseResponse, getCurrentLevelName, getLevel, getLevelNames, isInsideLevelArea, Level, login, runSaveStructure, saveLevel, saveOnline, saveStructure, signIn, sleep } from "utils";
+import { BlockSettings } from "settings";
+import { createAccount, createLevel, deleteLevel, FirebaseResponse, generateLevelCode, getCurrentLevelName, getLevel, getLevelNames, isInsideLevelArea, Level, login, metadataToArray, OnlineLevel, playtestLevel, runSaveStructure, saveLevel, saveStructure, signIn, sleep } from "utils";
 
 async function signUpUI(player: Player) {
     if (player.persistentId == "") return player.sendMessage(`You have to sign in to sign in.`);
@@ -148,7 +150,7 @@ function levelMainUI(player: Player, levelName?: string) {
     const label1 = { title: new ObservableString(initLabel1), visible: new ObservableBoolean(true), spacer1: new ObservableBoolean(true), spacer2: new ObservableBoolean(true), spacer3: new ObservableBoolean(false) };
     const textField1 = { title: new ObservableString("Level Name"), text: new ObservableString("My Level", { clientWritable: true }), vis: new ObservableBoolean(false), disabled: new ObservableBoolean(false), description: new ObservableString("") }
     const textField2 = { title: new ObservableString("Level Description (Optional)"), text: new ObservableString("", { clientWritable: true }), vis: new ObservableBoolean(false), disabled: new ObservableBoolean(false), description: new ObservableString("") }
-    const buttonData: { title: ObservableString, cb: () => void, vis: ObservableBoolean, disabled: ObservableBoolean, spacerVis: ObservableBoolean, dividerVis: ObservableBoolean }[] = [];
+    const buttonData: { title: ObservableString, cb: () => void, vis: ObservableBoolean, disabled: ObservableBoolean, spacerVis: ObservableBoolean, dividerVis: ObservableBoolean, tooltip: ObservableString }[] = [];
     const toggle1 = { title: new ObservableString("Remember Me"), toggled: new ObservableBoolean(false, { clientWritable: true }), vis: new ObservableBoolean(false), disabled: new ObservableBoolean(false), description: new ObservableString("") }
     let insideLevelsForm = false;
 
@@ -188,14 +190,15 @@ function levelMainUI(player: Player, levelName?: string) {
         const cb = () => {
             console.warn("not updated cb")
         }
+        const tooltip = new ObservableString("")
         const vis = new ObservableBoolean(false)
         const disabled = new ObservableBoolean(false)
         const spacerVis = new ObservableBoolean(false);
         const dividerVis = new ObservableBoolean(false);
-        form.button(title, () => buttonData[i].cb(), { visible: vis, disabled })
+        form.button(title, () => buttonData[i].cb(), { visible: vis, disabled, tooltip })
         form.divider({ visible: dividerVis });
         form.spacer({ visible: spacerVis })
-        buttonData.push({ title, cb, vis, disabled, spacerVis, dividerVis });
+        buttonData.push({ title, cb, vis, disabled, spacerVis, dividerVis, tooltip });
     }
 
     function allButtonSet(data: { title?: string, cb?: () => void, vis?: boolean, disabled?: boolean, spacerVis?: boolean, dividerVis?: boolean }) {
@@ -322,7 +325,8 @@ function levelMainUI(player: Player, levelName?: string) {
 
         const button1 = buttonData[0];
         button1.title.setData("Edit");
-        button1.vis.setData(getCurrentLevelName(player) != levelName);
+        button1.vis.setData(true);
+        // button1.vis.setData(getCurrentLevelName(player) != levelName);
         button1.cb = () => {
             if (!isInsideLevelArea(player)) {
                 const dimension = findAvailableDimension();
@@ -376,9 +380,16 @@ function levelMainUI(player: Player, levelName?: string) {
         };
 
         const button5 = buttonData[4];
-        button5.title.setData("Back");
+        button5.title.setData("Playtest");
         button5.vis.setData(true);
         button5.cb = () => {
+            playtestLevel(player, level);
+        };
+
+        const button6 = buttonData[5];
+        button6.title.setData("Back");
+        button6.vis.setData(true);
+        button6.cb = () => {
             myLevelsForm();
         };
     }
@@ -448,14 +459,22 @@ function levelMainUI(player: Player, levelName?: string) {
             if (!account) return editLevelForm(level.name);
             label1.title.setData(`Posting ${level.name}...`);
             // console.warn(JSON.stringify(login))
-            const saveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com//level/${level.name}${Date.now()}.json?auth=${account.idToken}`, {
+            const levelCode = generateLevelCode();
+            const saveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/levels/${levelCode}.json?auth=${account.idToken}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ creator: level.creator, name: level.name, structure: level.structure, description: level.description, ownerId: account.localId }),
+                body: JSON.stringify({ creator: level.creator, name: level.name, description: level.description, ownerId: account.localId }),
             })
-            if (saveReq.status == ServerStatusResponse.Success) {
+            const dataSaveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/level_data/${levelCode}.json?auth=${account.idToken}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ structure: level.structure, levelData: level.customLevelData, ownerId: account.localId }),
+            })
+            if (dataSaveReq.status == ServerStatusResponse.Success) {
                 label1.title.setData(`Posted ${level.name}!`);
                 await sleep(30);
                 editLevelForm(level.name);
@@ -496,10 +515,10 @@ function levelMainUI(player: Player, levelName?: string) {
         button1.vis.setData(true);
         button1.disabled.setData(false);
         button1.cb = () => {
-            createLevel(player, textField1.text.getData(), textField2.text.getData());
+            const level = createLevel(player, textField1.text.getData(), textField2.text.getData());
             const dimension = findAvailableDimension();
             if (dimension) {
-                loadDimension(player, dimension)
+                loadDimension(player, dimension, level as Level)
                 form.close();
             } else {
                 console.warn("smth happened bum")
@@ -521,35 +540,85 @@ function levelMainUI(player: Player, levelName?: string) {
     }
 }
 
-function scriptUI(player: Player) {
+async function scriptUI(player: Player) {
+    // const account = await signIn(player);
+    // if (account == undefined) return;
+    // const levelReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/levels.json?auth=${account.idToken}`)
+    // if (levelReq.status != ServerStatusResponse.Success) return;
+    // const levels = metadataToArray(levelReq.getData());
+    // console.warn(JSON.stringify(levels))
+    // const levelTempArr = []
+    const levelAmount = 64
     const form = new DynamicActionUI(300, 200, { body_texture: "textures/ui/greyBorder", header_texture: "textures/ui/greyBorder" }, { height: 40, width: 300 }, { x: 0, y: 0 }, { autoCenter: true })
-    form.title(new Label("Levels", { x: 0, y: 0 }, 3, "center", undefined, {fontType: "MinecraftTen"}));
+    form.title(new Label("Levels", { x: 0, y: 0 }, 3, "center", undefined, { fontType: "MinecraftTen" }));
+    const buttonArr: Button[] = [];
+    for (let i = 0; i < levelAmount; i++) {
+        buttonArr.push(
+            new Button(
+                new ButtonPanel({ x: 0, y: 0 }, { height: 32, width: 32 }),
+                undefined,
+                // undefined,
+                new Label("Hello World!", { x: 0, y: 0 }, 1, "center", 30),
+                () => {
+                    clicked(i);
+                },
+                { buttonTextures: { default_texture: "textures/ui/button_borderless_dark", hover_texture: "textures/ui/button_borderless_darkhover" }, forceGlobalTextParent: true, hoverText: "Level 2", }
+            )
+        )
+    }
     form.grid(new Grid(
-        [
-            new Button(
-                new ButtonPanel({ x: 0, y: 0 }, { height: 32, width: 32 }),
-                undefined,
-                new Label("Hello world!", { x: 11, y: 32 }, 0.5, "center", 30),
-                () => {
-                    console.warn("clicked button!")
-                },
-                { buttonTextures: { default_texture: "textures/ui/button_borderless_dark", hover_texture: "textures/ui/button_borderless_darkhover" }, forceGlobalTextParent: true, hoverText: "Level 1" }
-            ),
-            new Button(
-                new ButtonPanel({ x: 0, y: 0 }, { height: 32, width: 32 }),
-                undefined,
-                new Label("Hello aaaaaa!", { x: 10 + 32, y: 32 }, 0.5, "center", 16),
-                () => {
-                    console.warn("clicked button!")
-                },
-                { buttonTextures: { default_texture: "textures/ui/classic-button", hover_texture: "textures/ui/classic-button-hover" }, forceGlobalTextParent: true, hoverText: "Level 2", }
-            ),
-        ],
-        { height: 1, width: 2 },
-        { height: 300, width: 64 },
+        buttonArr,
+        { height: 8, width: 8 },
+        { height: 280, width: 280 },
         { x: 10, y: 10 },
     ))
+
+    function clicked(number: number) {
+
+    }
+
     form.show(player);
+}
+
+function scriptUI2(player: Player) {
+    const form = new DynamicActionUI(300, 200, { body_texture: "textures/ui/greyBorder", header_texture: "textures/ui/greyBorder" }, { height: 40, width: 300 }, { x: 0, y: 0 }, { autoCenter: true })
+    form.title(new Label("Levels", { x: 0, y: 0 }, 3, "center", undefined, { fontType: "MinecraftTen" }));
+    const levelAmount = 20
+    const buttonArr = [];
+    for (let i = 0; i < levelAmount; i++) {
+        buttonArr.push(
+            new Button(
+                new ButtonPanel({ x: 10, y: 10 }, { height: 24, width: 276 }),
+                undefined,
+                // undefined,
+                new Label(`Level ${i + 1}`, { x: 15, y: 16 + (i * 24) }, 1, "left"),
+                () => {
+                    console.warn("hi");
+                },
+                { buttonTextures: { default_texture: "textures/ui/button_borderless_dark", hover_texture: "textures/ui/button_borderless_darkhover" }, forceGlobalTextParent: true, hoverText: `Level ${i + 1}`, }
+            )
+        )
+    }
+    form.customScrollingContentPanel(new ScrollingPanel({
+        height: 180, width: 300
+    }, {
+        x: 0, y: 10
+    }))
+    form.stack(new Stacker(
+        ...buttonArr
+    ))
+    form.show(player);
+}
+
+function vanillaUI(player: Player) {
+    const form = new ActionFormData();
+    form.title("normal:a");
+    form.button("a");
+    form.show(player);
+}
+
+function settingsUI(player: Player, settings: BlockSettings) {
+    
 }
 
 // Edit level ui 
@@ -571,11 +640,22 @@ world.afterEvents.itemUse.subscribe(async ({ itemStack, source: player }) => {
     if (itemStack.typeId == "minecraft:copper_nugget") {
         scriptUI(player);
     }
+    if (itemStack.typeId == "minecraft:copper_ingot") {
+        scriptUI2(player);
+    }
+    if (itemStack.typeId == "minecraft:iron_ingot") vanillaUI(player);
     if (itemStack.typeId == "minecraft:raw_gold") {
         const data = await signIn(player);
         if (data == undefined) return;
         const json = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/level/Doohickey1788753137818.json?auth=${data.idToken}`, {}, undefined, undefined, (c, total) => {
             console.warn(`${c} / ${total}`);
         })
+    }
+    if (itemStack.typeId == "minecraft:diamond") {
+        const molang = new MolangVariableMap();
+        molang.setFloat("variable.index", 0);
+        molang.setFloat("variable.lifetime", 1);
+        molang.setFloat("variable.size", 0.5);
+        player.dimension.spawnParticle("parkour:finish", { x: 0.5, y: -62.5, z: 0.5 }, molang);
     }
 })
