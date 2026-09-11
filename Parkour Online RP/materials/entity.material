@@ -1,55 +1,69 @@
 {
     "materials": {
         "version": "1.0.0",
-        "custom_transparent:entity": {
+        "custom_transparent:entity_alphablend": {
+            "+defines": [
+                "COLOR_BASED",
+                "USE_OVERLAY",
+                "BLEND"
+            ],
             "+states": [
                 "Blending",
-                "DisableCulling",
-                "DisableDepthWrite",
-                "DisableAlphaWrite"
+                "EnableStencilTest",
+                "StencilWrite"
             ],
+            "frontFace": {
+                "stencilFunc": "Always",
+                "stencilFailOp": "Replace",
+                "stencilDepthFailOp": "Replace",
+                "stencilPassOp": "Replace"
+            },
+            "backFace": {
+                "stencilFunc": "Always",
+                "stencilFailOp": "Replace",
+                "stencilDepthFailOp": "Replace",
+                "stencilPassOp": "Replace"
+            },
+            "stencilRef": 6,
             "blendSrc": "SourceAlpha",
-            "blendDst": "OneMinusSrcAlpha",
-            "vertexFields": [
-                {
-                    "field": "Position"
-                },
-                {
-                    "field": "Color"
-                },
-                {
-                    "field": "Normal"
-                },
-                {
-                    "field": "UV0"
-                }
+            "blendDst": "One"
+        },
+        "outline_base:entity_alphatest": {
+            "+defines": [
+                "USE_SKINNING",
+                "USE_OVERLAY"
             ],
-            "variants": [
-                {
-                    "skinning": {
-                        "+defines": [
-                            "USE_SKINNING"
-                        ],
-                        "vertexFields": [
-                            {
-                                "field": "Position"
-                            },
-                            {
-                                "field": "BoneId0"
-                            },
-                            {
-                                "field": "Color"
-                            },
-                            {
-                                "field": "Normal"
-                            },
-                            {
-                                "field": "UV0"
-                            }
-                        ]
-                    }
-                }
-            ]
+            "+states": [
+                "EnableStencilTest",
+                "StencilWrite"
+            ],
+            "frontFace": {
+                "stencilFunc": "Always",
+                "stencilFailOp": "Replace",
+                "stencilDepthFailOp": "Replace",
+                "stencilPassOp": "Replace"
+            },
+            "backFace": {
+                "stencilFunc": "Always",
+                "stencilFailOp": "Replace",
+                "stencilDepthFailOp": "Replace",
+                "stencilPassOp": "Replace"
+            },
+            "stencilRef": 6
+        },
+        "outline_main:outline_base": {
+            "+states": [
+                "DisableDepthWrite",
+                "DisableCulling"
+            ],
+            "frontFace": {
+                "stencilFunc": "NotEqual",
+                "stencilPassOp": "Keep"
+            },
+            "backFace": {
+                "stencilFunc": "NotEqual",
+                "stencilPassOp": "Keep"
+            }
         }
     }
 }

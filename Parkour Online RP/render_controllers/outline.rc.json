@@ -8,7 +8,13 @@
                     "*": "material.default"
                 }
             ],
-            "textures": ["texture.default"]
+            "textures": ["texture.default"],
+            "overlay_color": {
+                "r": "q.property('parkour:red')",
+                "g": "q.property('parkour:green')",
+                "b": "q.property('parkour:blue')",
+                "a": 1
+            }
         },
         "controller.render.outline": {
             "geometry": "geometry.outline",
@@ -17,11 +23,17 @@
                     "*": "material.outline"
                 }
             ],
+            "color": {
+                "r": "q.property('parkour:alpha')",
+                "g": "q.property('parkour:alpha')",
+                "b": "q.property('parkour:alpha')",
+                "a": 1
+            },
             "overlay_color": {
-                "r": "q.property('parkour:red')",
-                "g": "q.property('parkour:green')",
-                "b": "q.property('parkour:blue')",
-                "a": "q.property('parkour:alpha')"
+                "r": "q.property('parkour:alpha')",
+                "g": "q.property('parkour:alpha')",
+                "b": "q.property('parkour:alpha')",
+                "a": 1
             },
             "textures": ["texture.default"]
         }

@@ -41,7 +41,7 @@
                 },
                 "parkour:alpha": {
                     "client_sync": true,
-                    "default": 0.5,
+                    "default": 0.2,
                     "range": [
                         0.0,
                         1.0
@@ -50,30 +50,30 @@
                 },
                 "parkour:size_x": {
                     "client_sync": true,
-                    "default": 10,
+                    "default": 10.0,
                     "range": [
-                        1,
-                        100
+                        0.0,
+                        200.0
                     ],
-                    "type": "int"
+                    "type": "float"
                 },
                 "parkour:size_y": {
                     "client_sync": true,
-                    "default": 10,
+                    "default": 10.0,
                     "range": [
-                        1,
-                        100
+                        0.0,
+                        200.0
                     ],
-                    "type": "int"
+                    "type": "float"
                 },
                 "parkour:size_z": {
                     "client_sync": true,
-                    "default": 10,
+                    "default": 10.0,
                     "range": [
-                        1,
-                        100
+                        0.0,
+                        200.0
                     ],
-                    "type": "int"
+                    "type": "float"
                 }
             }
         },
@@ -90,6 +90,13 @@
                 "has_collision": false,
                 "has_gravity": false
             },
+            "minecraft:fire_immune": {},
+            "minecraft:knockback_resistance": {
+                "value": 1,
+                "max": 1
+            },
+            "minecraft:body_rotation_blocked": {},
+            "minecraft:cannot_be_attacked": {},
             "minecraft:collision_box": {
                 "height": 1,
                 "width": 1

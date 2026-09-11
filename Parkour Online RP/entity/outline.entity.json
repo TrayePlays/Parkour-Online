@@ -11,13 +11,16 @@
                 "default": "textures/game/white"
             },
             "materials": {
-                "default": "entity_alphatest",
-                "outline": "entity_beam_additive"
+                "default": "outline_main",
+                "outline": "custom_transparent"
+            },
+            "animations": {
+                "outline": "animation.outline.default",
+                "outline_grid": "animation.outline_grid.default"
             },
             "scripts": {
-                "scalex": "q.property('parkour:size_x')",
-                "scaley": "q.property('parkour:size_y')",
-                "scalez": "q.property('parkour:size_z')"
+                "should_update_bones_and_effects_offscreen": true,
+                "animate": ["outline", "outline_grid"]
             },
             "render_controllers": ["controller.render.outline", "controller.render.outline_base"]
         }

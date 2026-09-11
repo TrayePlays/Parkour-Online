@@ -278,6 +278,18 @@ export function saveLevel(player: ParkourPlayer, name: string, newLevelData: { n
     return levelData;
 }
 
+export function getCenter(location1: Vector3, location2: Vector3): Vector3 {
+    const minX = Math.min(location1.x, location2.x);
+    const minY = Math.min(location1.y, location2.y);
+    const minZ = Math.min(location1.z, location2.z);
+
+    const halfX = Math.abs(location1.x - location2.x) / 2;
+    const halfY = Math.abs(location1.y - location2.y) / 2;
+    const halfZ = Math.abs(location1.z - location2.z) / 2;
+
+    return { x: minX + halfX, y: minY + halfY, z: minZ + halfZ };
+}
+
 export function deleteLevel(name: string) {
     const meta = world.getDynamicProperty(`parkourLevel|${name}|meta`) as number
     if (meta == undefined) return false;

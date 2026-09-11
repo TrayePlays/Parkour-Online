@@ -1,0 +1,55 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"animation.outline_grid.default": {
+			"loop": true,
+			"bones": {
+				"up": {
+					"scale": [1, "q.property('parkour:size_y')", 1]
+				},
+				"north": {
+					"scale": [1, 1, "q.property('parkour:size_z')"]
+				},
+				"east": {
+					"scale": ["q.property('parkour:size_x')", 1, 1]
+				},
+				"up_front_right": {
+					"position": [0, 0, 0]
+				},
+				"up_front_left": {
+					"position": ["q.property('parkour:size_x') * 16 - 16", 0, 0]
+				},
+				"up_back_right": {
+					"position": [0, 0, "q.property('parkour:size_z') * 16 - 16"]
+				},
+				"up_back_left": {
+					"position": ["q.property('parkour:size_x') * 16 - 16", 0, "q.property('parkour:size_z') * 16 - 16"]
+				},
+				"north_bottom_right": {
+					"position": [0, 0, 0]
+				},
+				"north_bottom_left": {
+					"position": ["q.property('parkour:size_x') * 16 - 16", 0, 0]
+				},
+				"north_top_right": {
+					"position": [0, "q.property('parkour:size_y') * 16 - 16", 0]
+				},
+				"north_top_left": {
+					"position": ["q.property('parkour:size_x') * 16 - 16", "q.property('parkour:size_y') * 16 - 16", 0]
+				},
+				"east_front_bottom": {
+					"position": [0, 0, 0]
+				},
+				"east_front_top": {
+					"position": [0, "q.property('parkour:size_y') * 16 - 16", 0]
+				},
+				"east_back_bottom": {
+					"position": [0, 0, "q.property('parkour:size_z') * 16 - 16"]
+				},
+				"east_back_top": {
+					"position": [0, "q.property('parkour:size_y') * 16 - 16", "q.property('parkour:size_z') * 16 - 16"]
+				}
+			}
+		}
+	}
+}

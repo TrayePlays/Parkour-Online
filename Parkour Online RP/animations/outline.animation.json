@@ -1,0 +1,13 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"animation.outline.default": {
+			"loop": true,
+			"bones": {
+				"all": {
+					"scale": ["query.property('parkour:size_x')", "query.property('parkour:size_y')", "query.property('parkour:size_z')"]
+				}
+			}
+		}
+	}
+}
