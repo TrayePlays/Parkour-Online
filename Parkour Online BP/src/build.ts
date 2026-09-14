@@ -1,6 +1,6 @@
 import { BlockVolume, Player, system, world } from "@minecraft/server";
 import { CustomDimension, dimensions } from "dimensions";
-import { isInside, Level, loadStructure, runLoadStructure } from "utils";
+import { isInside, Level, loadStructure, ParkourPlayer, runLoadStructure } from "utils";
 
 const PARKOUR_CONFIG = {
     max: { x: 64, y: 128, z: 64 }
@@ -38,7 +38,7 @@ export async function clearDimension(dim: CustomDimension) {
     world.tickingAreaManager.removeTickingArea(`${dim.typeId}_clear`);
 }
 
-export async function loadDimension(player: Player, dim: CustomDimension, level?: Level) {
+export async function loadDimension(player: ParkourPlayer, dim: CustomDimension, level?: Level) {
     await clearDimension(dim);
     player.camera.fade({ fadeColor: { blue: 0, green: 0, red: 0 }, fadeTime: { holdTime: 0.25, fadeInTime: 0, fadeOutTime: 0.5 } })
     const dimensionIndex = dimensions.findIndex(d => d.typeId == dim.typeId);
@@ -50,6 +50,7 @@ export async function loadDimension(player: Player, dim: CustomDimension, level?
     world.tickingAreaManager.removeTickingArea(`${dim.typeId}_load`);
     if (level && level.name) {
         player.setDynamicProperty("currentLevel", level.name)
+        player.parkourLevel = level;
     }
     if (level && level.structure) {
         runLoadStructure(level.structure, dimension, { x: -32, y: -64, z: -32 }, () => {

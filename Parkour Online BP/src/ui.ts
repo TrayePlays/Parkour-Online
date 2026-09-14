@@ -1,5 +1,5 @@
 import { BlockPermutation, MolangVariableMap, Player, system, world } from "@minecraft/server";
-import { ActionFormData, CustomForm, ObservableBoolean, ObservableString } from "@minecraft/server-ui"
+import { ActionFormData, CustomForm, ObservableBoolean, ObservableNumber, ObservableString } from "@minecraft/server-ui"
 import { ServerStatusResponse } from "api";
 import { findAvailableDimension, loadDimension } from "build";
 import { dimensions } from "dimensions";
@@ -353,7 +353,7 @@ function levelMainUI(player: Player, levelName?: string) {
             }, async (structure) => {
                 label1.title.setData(`§aSaved ${levelName}!`)
                 player.playSound("note.bell");
-                saveLevel(player, levelName, { newStructure: structure });
+                saveLevel(player, levelName, { structure });
                 await sleep(30)
                 label1.title.setData(`Level: ${levelName}${level.description ? `\n${level.description}` : ""}`)
                 allButtonSet({ disabled: false });
@@ -617,8 +617,30 @@ function vanillaUI(player: Player) {
     form.show(player);
 }
 
-function settingsUI(player: Player, settings: BlockSettings) {
-    
+export function settingsUI(player: Player, settings: BlockSettings) {
+    const form = new CustomForm(player, "Settings")
+    const toggleStates: {toggled: ObservableBoolean, cb: (toggled: boolean) => void}[] = [];
+    const sliderStates: {value: ObservableNumber, cb: (value: number) => void}[] = [];
+    settings.sliders?.forEach((s) => {
+        const value = new ObservableNumber(s.default, {clientWritable: true})
+        form.slider(s.name, value, s.min, s.max, {description: s.description, step: s.step});
+        sliderStates.push({value, cb: s.cb})
+    })
+    settings.toggles?.forEach((t) => {
+        const toggled = new ObservableBoolean(t.default ?? false, { clientWritable: true })
+        form.toggle(t.name, toggled, { description: t.description });
+        toggleStates.push({toggled, cb: t.cb});
+    })
+    form.button("Submit", () => {
+        form.close();
+        sliderStates.forEach((s) => {
+            s.cb(s.value.getData())
+        })
+        toggleStates.forEach((t) => {
+            t.cb(t.toggled.getData());
+        })
+    })
+    form.show();
 }
 
 // Edit level ui 

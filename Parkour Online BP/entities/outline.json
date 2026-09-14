@@ -98,8 +98,8 @@
             "minecraft:body_rotation_blocked": {},
             "minecraft:cannot_be_attacked": {},
             "minecraft:collision_box": {
-                "height": 1,
-                "width": 1
+                "height": 0,
+                "width": 0
             }
         }
     }

@@ -1,8 +1,17 @@
-import { MolangVariableMap, system, world } from "@minecraft/server";
-import { getCenter } from "utils";
+import { GameMode, MolangVariableMap, system, world } from "@minecraft/server";
+import { getCenter, ParkourPlayer } from "utils";
 
 function levelTick() {
-
+    for (const player of (world.getPlayers() as ParkourPlayer[]).filter(p => p.parkourLevel != undefined)) {
+        if (!player.parkourLevel) continue;
+        if (player.getGameMode() == GameMode.Adventure) {
+            //respawning system
+            if (player.location.y < -66) {
+                player.teleport(player.parkourLevel.customLevelData.spawnLocation);
+            }
+        }
+        // outline
+    }
 }
 
 system.runInterval(() => {
@@ -31,4 +40,6 @@ system.runInterval(() => {
         outline.setProperty("parkour:alpha", 0.15);
         i++
     }
+
+    levelTick();
 })

@@ -19,6 +19,7 @@ export async function sleep(ticks: number) {
 }
 
 export class ParkourPlayer extends Player {
+    parkourLevel?: Level;
     loggedIn?: boolean;
     userId?: string;
 }
@@ -230,7 +231,9 @@ export function decompressLZW(compressed: string): string {
     return result;
 }
 
-export function getCurrentLevelName(player: Player): string | undefined {
+export function getCurrentLevelName(player: ParkourPlayer): string | undefined {
+    const currentLevel = player.getDynamicProperty("currentLevel") as string ?? undefined
+    if (currentLevel && player.parkourLevel?.name != currentLevel) player.parkourLevel = getLevel(currentLevel);
     return player.getDynamicProperty("currentLevel") as string ?? undefined;
 }
 
@@ -255,27 +258,66 @@ export function createLevel(player: ParkourPlayer, name: string, description?: s
     return levelData;
 }
 
-export function saveLevel(player: ParkourPlayer, name: string, newLevelData: { newName?: string, newDescription?: string, newStructure?: SavedStructure, newLevelData?: CustomLevelData }) {
+interface CustomLevelDataUpdates {
+    spawnLocation?: Partial<Vector3>;
+    endLocation?: Partial<Vector3>;
+    checkpoints?: Checkpoint[];
+    deathZones?: DeathZone[];
+}
+
+interface LevelUpdates {
+    name?: string;
+    description?: string;
+    structure?: SavedStructure;
+    customLevelData?: CustomLevelDataUpdates;
+}
+
+export function saveLevel(player: ParkourPlayer, name: string, updates: LevelUpdates) {
     const oldLevelData = getLevel(name);
     if (!oldLevelData) return;
-    const levelData: Level = {
-        name: newLevelData.newName ?? oldLevelData.name,
-        structure: newLevelData.newStructure ?? oldLevelData.structure,
-        description: newLevelData.newDescription ?? oldLevelData.description,
-        customLevelData: newLevelData.newLevelData ?? oldLevelData.customLevelData,
-        creator: oldLevelData.creator,
-    }
 
-    if (newLevelData.newName != oldLevelData.name) deleteLevel(name);
+    const levelName = updates.name ?? oldLevelData.name;
+
+    const levelData: Level = {
+        ...oldLevelData,
+        name: levelName,
+        description: updates.description ?? oldLevelData.description,
+        structure: updates.structure ?? oldLevelData.structure,
+        customLevelData: {
+            ...oldLevelData.customLevelData,
+            ...updates.customLevelData,
+            spawnLocation: {
+                ...oldLevelData.customLevelData.spawnLocation,
+                ...updates.customLevelData?.spawnLocation,
+            },
+
+            endLocation: {
+                ...oldLevelData.customLevelData.endLocation,
+                ...updates.customLevelData?.endLocation,
+            },
+        },
+    };
+
+    if (levelName !== name) {
+        deleteLevel(name);
+    }
 
     const lzw = compressLZW(JSON.stringify(levelData));
     const chunks = splitBytes(lzw);
+
     chunks.forEach((chunk, i) => {
-        world.setDynamicProperty(`parkourLevel|${name}|${i}`, chunk)
-    })
-    world.setDynamicProperty(`parkourLevel|${name}|meta`, chunks.length);
+        world.setDynamicProperty(`parkourLevel|${levelName}|${i}`, chunk);
+    });
+
+    world.setDynamicProperty(`parkourLevel|${levelName}|meta`, chunks.length);
+
+    player.parkourLevel = levelData;
 
     return levelData;
+}
+
+export function getDistance(location1: Vector3, location2: Vector3) {
+    return Math.sqrt(Math.pow(location1.x - location2.x, 2) + Math.pow(location1.y - location2.y, 2) + Math.pow(location1.z - location2.z, 2));
 }
 
 export function getCenter(location1: Vector3, location2: Vector3): Vector3 {
@@ -314,7 +356,7 @@ export function getLevelNames(): string[] {
         .sort();
 }
 
-export function getLevel(name: string): Level | undefined {
+export function getLevel(name: string, player?: ParkourPlayer): Level | undefined {
     const levelMeta = world.getDynamicProperty(`parkourLevel|${name}|meta`) as number
     if (levelMeta == undefined) return;
     let levelDataRaw = "";
@@ -323,7 +365,9 @@ export function getLevel(name: string): Level | undefined {
     }
     const levelDataDecompressed = decompressLZW(levelDataRaw);
     try {
-        return JSON.parse(levelDataDecompressed) as Level;
+        const level = JSON.parse(levelDataDecompressed) as Level
+        if (player) player.parkourLevel = level
+        return level;
     } catch { };
 }
 
