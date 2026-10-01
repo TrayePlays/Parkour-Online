@@ -4,7 +4,7 @@
 		"description": {
 			"identifier": "parkour:death",
 			"basic_render_parameters": {
-				"material": "particles_blend",
+				"material": "particles_alpha",
 				"texture": "textures/blocks/death"
 			}
 		},
@@ -30,9 +30,6 @@
 					"uv": [0, 0],
 					"uv_size": [16, 16]
 				}
-			},
-			"minecraft:particle_appearance_tinting": {
-				"color": ["v.color.r", "v.color.g", "v.color.b", "v.color.a"]
 			}
 		}
 	}

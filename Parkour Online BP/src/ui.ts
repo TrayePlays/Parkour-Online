@@ -12,8 +12,9 @@ import { ScrollingPanel } from "lib/elements/singles/scrollingPanel";
 import { Stacker } from "lib/elements/stacker";
 import { DynamicActionUI } from "lib/ui";
 import { api } from "main";
-import { BlockSettings } from "settings";
-import { createAccount, createLevel, deleteLevel, FirebaseResponse, generateLevelCode, getCurrentLevelName, getLevel, getLevelNames, isInsideLevelArea, Level, login, metadataToArray, OnlineLevel, playtestLevel, runSaveStructure, saveLevel, saveStructure, signIn, sleep } from "utils";
+import { updateOutlines } from "outline";
+import { BlockSettings, SettingsElementType } from "settings";
+import { Checkpoint, createAccount, createLevel, DeathZone, deleteLevel, FirebaseResponse, generateLevelCode, getLevel, getLevelNames, getPlayerLevel, isInsideLevelArea, Level, login, metadataToArray, OnlineLevel, ParkourPlayer, playtestLevel, returnToEditor, runSaveStructure, saveLevel, saveStructure, signIn, sleep, ZoneType } from "utils";
 
 async function signUpUI(player: Player) {
     if (player.persistentId == "") return player.sendMessage(`You have to sign in to sign in.`);
@@ -143,7 +144,7 @@ async function signUpUI(player: Player) {
     form.show();
 }
 
-function levelMainUI(player: Player, levelName?: string) {
+function levelMainUI(player: ParkourPlayer, levelName?: string) {
     const maxLevels = 4
     const form = new CustomForm(player, "Levels");
     const initLabel1 = "Create a level or Play others levels online!"
@@ -556,9 +557,9 @@ async function scriptUI(player: Player) {
         buttonArr.push(
             new Button(
                 new ButtonPanel({ x: 0, y: 0 }, { height: 32, width: 32 }),
-                undefined,
+                new Image("textures/items/apple", { x: 16 + (35 * ((i % 8))), y: 12 + (35 * (Math.floor(i / 8))) }, { height: 24, width: 24 }),
                 // undefined,
-                new Label("Hello World!", { x: 0, y: 0 }, 1, "center", 30),
+                new Label("a", { x: 11 + (35 * ((i % 8))), y: 20 + (35 * (Math.floor(i / 8))) }, 1, "center", 1),
                 () => {
                     clicked(i);
                 },
@@ -619,28 +620,262 @@ function vanillaUI(player: Player) {
 
 export function settingsUI(player: Player, settings: BlockSettings) {
     const form = new CustomForm(player, "Settings")
-    const toggleStates: {toggled: ObservableBoolean, cb: (toggled: boolean) => void}[] = [];
-    const sliderStates: {value: ObservableNumber, cb: (value: number) => void}[] = [];
-    settings.sliders?.forEach((s) => {
-        const value = new ObservableNumber(s.default, {clientWritable: true})
-        form.slider(s.name, value, s.min, s.max, {description: s.description, step: s.step});
-        sliderStates.push({value, cb: s.cb})
-    })
-    settings.toggles?.forEach((t) => {
-        const toggled = new ObservableBoolean(t.default ?? false, { clientWritable: true })
-        form.toggle(t.name, toggled, { description: t.description });
-        toggleStates.push({toggled, cb: t.cb});
-    })
+    const states: { state: any, cb: (value: any) => void }[] = [];
+
+    for (const setting of settings.elements) {
+        if (setting.type == SettingsElementType.Slider) {
+            const value = new ObservableNumber(setting.default, { clientWritable: true });
+            value.subscribe((val) => setting.cb(val))
+
+            form.slider(setting.name, value, setting.min, setting.max, {
+                description: setting.description,
+                step: setting.step,
+                visible: setting.visible
+            });
+
+            states.push({ state: value, cb: setting.cb });
+        }
+
+        if (setting.type == SettingsElementType.Toggle) {
+            const toggled = new ObservableBoolean(setting.default ?? false, { clientWritable: true });
+            toggled.subscribe((val) => setting.cb(val))
+
+            form.toggle(setting.name, toggled, {
+                description: setting.description,
+                visible: setting.visible
+            });
+
+            states.push({ state: toggled, cb: setting.cb });
+        }
+
+        if (setting.type == SettingsElementType.TextField) {
+            const value = new ObservableString(setting.default ?? "", { clientWritable: true });
+
+            form.textField(setting.name, value, {
+                description: setting.description,
+                visible: setting.visible
+            });
+
+            states.push({ state: value, cb: setting.cb });
+        }
+
+        if (setting.type == SettingsElementType.Dropdown) {
+            const value = new ObservableNumber(setting.default ?? 0, { clientWritable: true });
+
+            form.dropdown(setting.name, value, setting.options, {
+                description: setting.description,
+                visible: setting.visible
+            });
+
+            states.push({ state: value, cb: setting.cb });
+        }
+
+        if (setting.type == SettingsElementType.Button) {
+            form.button(setting.name, () => {
+                setting.cb();
+                const close = setting.close instanceof ObservableBoolean ? setting.close.getData() : setting.close;
+
+                if (close) {
+                    form.close();
+                }
+            });
+        }
+
+        if (setting.type == SettingsElementType.Divider) {
+            form.divider({ visible: setting.visible });
+        }
+
+        if (setting.type == SettingsElementType.Label) {
+            form.label(setting.text, { visible: setting.visible });
+        }
+
+        if (setting.type == SettingsElementType.Header) {
+            form.header(setting.text, { visible: setting.visible });
+        }
+
+        if (setting.type == SettingsElementType.Image) {
+            form.image(setting.path, setting.packId, { visible: setting.visible })
+        }
+    }
+
     form.button("Submit", () => {
         form.close();
-        sliderStates.forEach((s) => {
-            s.cb(s.value.getData())
-        })
-        toggleStates.forEach((t) => {
-            t.cb(t.toggled.getData());
-        })
-    })
+
+        for (const state of states) {
+            state.cb(state.state.getData());
+        }
+    });
+
     form.show();
+}
+
+export function spawnSettingsUI(player: Player, level: Level) {
+    settingsUI(player, {
+        elements: [
+            {
+                type: SettingsElementType.Slider,
+                name: "Y Rotation",
+                default: level.customLevelData.spawn.rotation.y,
+                max: 360,
+                min: 0,
+                cb(value) {
+                    saveLevel(player, level.name, { customLevelData: { spawn: { rotation: { y: value } } } })
+                },
+            },
+            {
+                type: SettingsElementType.Slider,
+                name: "X Rotation",
+                default: level.customLevelData.spawn.rotation.x,
+                max: 360,
+                min: 0,
+                cb(value) {
+                    saveLevel(player, level.name, { customLevelData: { spawn: { rotation: { x: value } } } })
+                },
+            }
+        ]
+    })
+}
+
+export function checkpointSettingsUI(player: ParkourPlayer, level: Level, checkpoint: Checkpoint) {
+    const enterMessage = new ObservableBoolean(checkpoint.settings?.enterMessage != undefined)
+    const currentMessage = checkpoint.settings?.enterMessage ?? "";
+
+    const closeDelete = new ObservableBoolean(false);
+    const deleteButtonMessage = new ObservableString("Delete (Press Twice)");
+    let clickCount = 0;
+
+    settingsUI(player, {
+        elements: [
+            {
+                type: SettingsElementType.Toggle,
+                name: "Enter Message?",
+                default: enterMessage.getData(),
+                cb(value) {
+                    enterMessage.setData(value);
+
+                    const checkpoints = [...(level.customLevelData.checkpoints ?? [])];
+                    const checkpointIndex = checkpoints.indexOf(checkpoint);
+                    if (checkpointIndex == -1) return;
+
+                    const currentCheckpoint = checkpoints[checkpointIndex];
+
+                    if (!value) {
+                        currentCheckpoint.settings = {
+                            ...currentCheckpoint.settings,
+                            enterMessage: undefined
+                        };
+                    }
+
+                    saveLevel(player, level.name, {
+                        customLevelData: {
+                            checkpoints
+                        }
+                    });
+                }
+            },
+            {
+                type: SettingsElementType.TextField,
+                name: "What should enter message say?",
+                default: currentMessage,
+                visible: enterMessage,
+                cb(value) {
+                    if (value.length == 0 || !enterMessage.getData()) return;
+
+                    const checkpoints = [...(level.customLevelData.checkpoints ?? [])];
+                    const checkpointIndex = checkpoints.indexOf(checkpoint);
+                    if (checkpointIndex == -1) return;
+
+                    const currentCheckpoint = checkpoints[checkpointIndex];
+
+                    currentCheckpoint.settings = {
+                        ...currentCheckpoint.settings,
+                        enterMessage: value
+                    };
+
+                    saveLevel(player, level.name, {
+                        customLevelData: {
+                            checkpoints
+                        }
+                    });
+                }
+            },
+            {
+                type: SettingsElementType.Spacer,
+                visible: true
+            },
+            {
+                type: SettingsElementType.Button,
+                name: deleteButtonMessage,
+                close: closeDelete,
+                cb() {
+                    if (clickCount == 0) {
+                        deleteButtonMessage.setData("Delete");
+                        clickCount++;
+                        return;
+                    }
+
+                    closeDelete.setData(true);
+
+                    if (checkpoint.type == ZoneType.Point) {
+                        player.dimension.setBlockType(checkpoint.location, "air");
+                    }
+
+                    const checkpoints = [...(level.customLevelData.checkpoints ?? [])];
+                    const checkpointIndex = checkpoints.indexOf(checkpoint);
+                    if (checkpointIndex == -1) return;
+
+                    checkpoints.splice(checkpointIndex, 1);
+
+                    saveLevel(player, level.name, {
+                        customLevelData: {
+                            checkpoints
+                        }
+                    });
+
+                    updateOutlines(player.dimension.id);
+                },
+            }
+        ]
+    })
+}
+
+export function deathZoneSettingsUI(player: ParkourPlayer, level: Level, deathZone: DeathZone) {
+    const closeDelete = new ObservableBoolean(false);
+    const deleteButtonMessage = new ObservableString("Delete (Press Twice)");
+    let clickCount = 0;
+
+    settingsUI(player, {
+        elements: [
+            {
+                type: SettingsElementType.Button,
+                name: deleteButtonMessage,
+                close: closeDelete,
+                cb() {
+                    if (clickCount == 0) {
+                        deleteButtonMessage.setData("Delete");
+                        clickCount++;
+                        return;
+                    }
+
+                    closeDelete.setData(true);
+
+                    const deathZones = [...(level.customLevelData.deathZones ?? [])];
+                    const deathZoneIndex = deathZones.indexOf(deathZone);
+                    if (deathZoneIndex == -1) return;
+
+                    deathZones.splice(deathZoneIndex, 1);
+
+                    saveLevel(player, level.name, {
+                        customLevelData: {
+                            deathZones
+                        }
+                    });
+
+                    updateOutlines(player.dimension.id);
+                },
+            }
+        ]
+    })
 }
 
 // Edit level ui 
@@ -649,7 +884,8 @@ export function settingsUI(player: Player, settings: BlockSettings) {
 // Upload level ui 
 // (opens after u verify or you can open it with edit level if level is alr verified)
 
-world.afterEvents.itemUse.subscribe(async ({ itemStack, source: player }) => {
+world.afterEvents.itemUse.subscribe(async ({ itemStack, source }) => {
+    const player = source as ParkourPlayer
     if (itemStack.typeId == "minecraft:torch") {
         signUpUI(player);
     }
@@ -657,13 +893,19 @@ world.afterEvents.itemUse.subscribe(async ({ itemStack, source: player }) => {
         levelMainUI(player);
     }
     if (itemStack.typeId == "minecraft:gold_nugget") {
-        levelMainUI(player, getCurrentLevelName(player));
+        levelMainUI(player, getPlayerLevel(player)?.name);
     }
     if (itemStack.typeId == "minecraft:copper_nugget") {
         scriptUI(player);
     }
     if (itemStack.typeId == "minecraft:copper_ingot") {
         scriptUI2(player);
+    }
+    if (itemStack.typeId == "parkour:playtest") {
+        playtestLevel(player, getPlayerLevel(player) ?? player.parkourLevel as Level);
+    }
+    if (itemStack.typeId == "minecraft:barrier") {
+        returnToEditor(player, getPlayerLevel(player) ?? player.parkourLevel as Level)
     }
     if (itemStack.typeId == "minecraft:iron_ingot") vanillaUI(player);
     if (itemStack.typeId == "minecraft:raw_gold") {

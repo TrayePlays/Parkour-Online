@@ -2,23 +2,19 @@
     "format_version": "1.26.0",
     "minecraft:item": {
         "description": {
-            "identifier": "parkour:checkpoint",
+            "identifier": "parkour:playtest",
             "menu_category": {
                 "category": "items",
                 "group": "parkour:itemGroup.name.parkour"
             }
         },
         "components": {
-            "minecraft:block_placer": {
-                "block": "parkour:checkpoint",
-                "replace_block_item": true
-            },
             "minecraft:display_name": {
-                "value": "Checkpoint"
+                "value": "Playtest"
             },
             "minecraft:icon": {
                 "textures": {
-                    "default": "checkpoint"
+                    "default": "play"
                 }
             },
             "minecraft:max_stack_size": 1

@@ -20,7 +20,8 @@
                 "textures": {
                     "default": "spawn"
                 }
-            }
+            },
+            "minecraft:max_stack_size": 1
         }
     }
 }

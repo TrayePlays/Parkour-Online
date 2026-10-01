@@ -16,6 +16,9 @@
         },
         "settings": {
             "textures": "textures/items/settings"
+        },
+        "play": {
+            "textures": "textures/items/play"
         }
     }
 }

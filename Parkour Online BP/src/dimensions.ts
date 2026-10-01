@@ -1,10 +1,17 @@
 import { system, world } from "@minecraft/server";
+import { getDimensionLevel, getLevel, getPlayerLevel, ParkourPlayer } from "utils";
 
 export const dimensions: CustomDimension[] = [];
+
 export interface CustomDimension {
     typeId: string;
-    using: boolean
+    using: boolean;
 }
+
+world.afterEvents.playerDimensionChange.subscribe(({ toDimension, player: source }) => {
+    const player = source as ParkourPlayer
+    player.parkourLevel = getPlayerLevel(player);
+})
 
 system.beforeEvents.startup.subscribe(({ dimensionRegistry }) => {
     for (let i = 0; i < 5; i++) {

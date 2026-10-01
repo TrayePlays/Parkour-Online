@@ -20,7 +20,8 @@
                 "textures": {
                     "default": "death"
                 }
-            }
+            },
+            "minecraft:max_stack_size": 1
         }
     }
 }

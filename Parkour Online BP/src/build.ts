@@ -1,6 +1,6 @@
-import { BlockVolume, Player, system, world } from "@minecraft/server";
+import { BlockVolume, system, world } from "@minecraft/server";
 import { CustomDimension, dimensions } from "dimensions";
-import { isInside, Level, loadStructure, ParkourPlayer, runLoadStructure } from "utils";
+import { isInside, Level, ParkourPlayer, runLoadStructure } from "utils";
 
 const PARKOUR_CONFIG = {
     max: { x: 64, y: 128, z: 64 }
@@ -9,7 +9,7 @@ const PARKOUR_CONFIG = {
 export function findAvailableDimension(): CustomDimension | undefined {
     checkIfUsingDimensions();
     for (const dimension of dimensions) {
-        if (dimension?.using != true) return dimension;
+        if (!dimension.using) return dimension;
     }
 }
 
@@ -29,6 +29,7 @@ export async function clearDimension(dim: CustomDimension) {
     const dimensionIndex = dimensions.findIndex(d => d.typeId == dim.typeId);
     if (dimensionIndex == -1) return console.warn("Dimension is invalid?");
     dimensions[dimensionIndex].using = false;
+    world.setDynamicProperty(`parkourDimension|${dim.typeId}`)
     const dimension = world.getDimension(dim.typeId);
     await world.tickingAreaManager.createTickingArea(`${dim.typeId}_clear`, { dimension: dimension, from: { x: max.x / 2, y: 64, z: max.z / 2 }, to: { x: -max.x / 2, y: -64, z: -max.z / 2 } });
     for (let i = 0; i < 32; i++) {
@@ -38,24 +39,25 @@ export async function clearDimension(dim: CustomDimension) {
     world.tickingAreaManager.removeTickingArea(`${dim.typeId}_clear`);
 }
 
-export async function loadDimension(player: ParkourPlayer, dim: CustomDimension, level?: Level) {
+export async function loadDimension(player: ParkourPlayer, dim: CustomDimension, level: Level) {
     await clearDimension(dim);
     player.camera.fade({ fadeColor: { blue: 0, green: 0, red: 0 }, fadeTime: { holdTime: 0.25, fadeInTime: 0, fadeOutTime: 0.5 } })
+
     const dimensionIndex = dimensions.findIndex(d => d.typeId == dim.typeId);
     if (dimensionIndex == -1) return console.warn("Dimension is invalid?");
+
     dimensions[dimensionIndex].using = true;
+    world.setDynamicProperty(`parkourDimension|${dim.typeId}`, level.name);
+
     const dimension = world.getDimension(dim.typeId);
     await world.tickingAreaManager.createTickingArea(`${dim.typeId}_load`, { dimension: dimension, from: { x: 0, y: -64, z: 0 }, to: { x: 0, y: -64, z: 0 } });
     dimension.setBlockType({ x: 0, y: -64, z: 0 }, "bedrock");
     world.tickingAreaManager.removeTickingArea(`${dim.typeId}_load`);
-    if (level && level.name) {
-        player.setDynamicProperty("currentLevel", level.name)
-        player.parkourLevel = level;
-    }
     if (level && level.structure) {
         runLoadStructure(level.structure, dimension, { x: -32, y: -64, z: -32 }, () => {
-            const spawnLocation = level.customLevelData.spawnLocation;
-            player.teleport({ x: spawnLocation.x + 0.5, y: spawnLocation.y, z: spawnLocation.z + 0.5 }, { dimension });
+            const spawn = level.customLevelData.spawn.location;
+            const rot = level.customLevelData.spawn.rotation;
+            player.teleport({ x: spawn.x + 0.5, y: spawn.y, z: spawn.z + 0.5 }, { dimension, rotation: rot });
             checkIfUsingDimensions();
         })
         return;

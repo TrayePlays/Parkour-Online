@@ -2,6 +2,7 @@
     "format_version": "1.10.0",
     "render_controllers": {
         "controller.render.outline_base": {
+            "ignore_lighting": true,
             "geometry": "geometry.default",
             "materials": [
                 {
@@ -17,6 +18,7 @@
             }
         },
         "controller.render.outline": {
+            "ignore_lighting": true,
             "geometry": "geometry.outline",
             "materials": [
                 {

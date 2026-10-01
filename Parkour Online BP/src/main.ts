@@ -3,6 +3,7 @@ import { HivemindAPI, ServerStatusResponse } from "api.js";
 
 import "./commands.js"
 import "./level.js"
+import "./outline.js"
 import "./specialItems.js"
 import "./ui.js"
 
@@ -20,6 +21,7 @@ async function onConnect() {
 
     if (updateReq.status == ServerStatusResponse.Success) {
         const data = JSON.parse(updateReq.getData()) as { version: number };
+        console.warn(updateReq.data)
         if (data.version > PARKOUR_VERSION) {
             world.sendMessage(`\n§cThis version of Parkour Online is outdated, Update to play levels on the latest version! §7(/song:settings to disable message)`);
         }

@@ -20,7 +20,8 @@
                 "textures": {
                     "default": "finish"
                 }
-            }
+            },
+            "minecraft:max_stack_size": 1
         }
     }
 }

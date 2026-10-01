@@ -20,9 +20,25 @@
             },
             "scripts": {
                 "should_update_bones_and_effects_offscreen": true,
-                "animate": ["outline", "outline_grid"]
+                "initialize": [
+                    "v.visible=false;"
+                ],
+                "pre_animation": [
+                    "v.visible=!q.is_in_ui && query.property('parkour:visible');"
+                ],
+                "animate": [
+                    "outline",
+                    "outline_grid"
+                ]
             },
-            "render_controllers": ["controller.render.outline", "controller.render.outline_base"]
+            "render_controllers": [
+                {
+                    "controller.render.outline": "v.visible"
+                },
+                {
+                    "controller.render.outline_base": "v.visible"
+                }
+            ]
         }
     }
 }

@@ -1,7 +1,7 @@
-import { Block, BlockPermutation, BlockVolume, Dimension, EnchantmentType, EquipmentSlot, GameMode, ItemLockMode, ItemStack, Player, system, Vector2, Vector3, world } from "@minecraft/server";
+import { Block, BlockPermutation, BlockVolume, Dimension, EnchantmentType, Entity, EquipmentSlot, GameMode, ItemLockMode, ItemStack, Player, system, Vector2, Vector3, world } from "@minecraft/server";
 import { ModalFormData } from "@minecraft/server-ui";
 import { ServerResponse, ServerStatusResponse } from "api";
-import { dimensions } from "dimensions";
+import { CustomDimension, dimensions } from "dimensions";
 import { api } from "main";
 
 export const API_KEY = "\u0041\u0049\u007A\u0061\u0053\u0079\u0043\u0051\u006C\u0036\u0032\u0041\u0078\u0061\u006E\u0042\u0036\u0069\u0052\u0052\u0032\u0063\u0078\u0054\u0051\u004E\u007A\u002D\u004D\u0073\u0074\u006B\u0066\u0069\u0045\u0030\u0046\u0045\u0051";
@@ -18,9 +18,33 @@ export async function sleep(ticks: number) {
     return;
 }
 
+export interface SpecialItemPlacement {
+    position1?: Vector3;
+}
+
+export enum OutlineTypes {
+    Checkpoint = "checkpoint",
+    Death = "death",
+    Finish = "finish",
+    Spawn = "spawn",
+}
+
+export interface DisplayOutline {
+    entity?: Entity;
+    pos1: Vector3;
+    pos2: Vector3;
+    type: OutlineTypes;
+}
+
 export class ParkourPlayer extends Player {
-    parkourLevel?: Level;
+    checkpoint?: Vector3;
     loggedIn?: boolean;
+    displayOutlinesLoaded?: boolean;
+    displayOutlines?: DisplayOutline[];
+    isPlaytesting?: boolean
+    deathZonePlacement?: SpecialItemPlacement
+    checkpointPlacement?: SpecialItemPlacement;
+    parkourLevel?: Level;
     userId?: string;
 }
 
@@ -50,27 +74,49 @@ export interface CheckpointSettings {
     enterMessage?: string;
 }
 
-export interface Checkpoint {
-    locations: Vector3 | Vector3[];
-    settings?: CheckpointSettings
+export enum ZoneType {
+    Point = "point",
+    Area = "area"
 }
 
-export interface DeathZone {
-    locations: Vector3 | Vector3[]
+export interface PointCheckpoint {
+    type: ZoneType.Point;
+    location: Vector3;
+    respawnLocation: Vector3;
+    settings?: CheckpointSettings;
+}
+
+export interface AreaCheckpoint {
+    type: ZoneType.Area;
+    locations: [Vector3, Vector3];
+    respawnLocation: Vector3;
+    settings?: CheckpointSettings;
+}
+
+export type Checkpoint = PointCheckpoint | AreaCheckpoint;
+
+export interface PointDeathZone {
+    type: ZoneType.Point;
+    location: Vector3;
+}
+
+export interface AreaDeathZone {
+    type: ZoneType.Area;
+    locations: [Vector3, Vector3];
+}
+
+export type DeathZone = PointDeathZone | AreaDeathZone;
+
+export interface LocationRotation {
+    location: Vector3;
+    rotation: Vector2;
 }
 
 export interface CustomLevelData {
-    spawnLocation: Vector3;
+    spawn: LocationRotation;
     endLocation: Vector3;
     checkpoints?: Checkpoint[];
     deathZones?: DeathZone[]
-}
-
-const a: CustomLevelData = {
-    spawnLocation: { x: 0, y: 0, z: 0 },
-    endLocation: { x: 0, y: 0, z: 0 },
-    checkpoints: [
-    ]
 }
 
 export interface OnlineLevel extends Level {
@@ -117,7 +163,7 @@ export function formatTypeId(typeId: string) {
     }
 }
 
-function getSelectionBounds(pos1: Vector3, pos2: Vector3, add = 0) {
+export function getSelectionBounds(pos1: Vector3, pos2: Vector3, add = 0) {
     return {
         minX: Math.min(pos1.x, pos2.x),
         maxX: Math.max(pos1.x, pos2.x) + add,
@@ -128,6 +174,24 @@ function getSelectionBounds(pos1: Vector3, pos2: Vector3, add = 0) {
         minZ: Math.min(pos1.z, pos2.z),
         maxZ: Math.max(pos1.z, pos2.z) + add,
     };
+}
+
+export function getSelectionBoundsMaxMin(pos1: Vector3, pos2: Vector3, add = 0) {
+    return [
+        { x: Math.min(pos1.x, pos2.x), y: Math.min(pos1.y, pos2.y), z: Math.min(pos1.z, pos2.z) },
+        { x: Math.max(pos1.x, pos2.x) + add, y: Math.max(pos1.y, pos2.y) + add, z: Math.max(pos1.z, pos2.z) + add }
+    ]
+}
+
+export function isLocationInArea(location: Vector3, pos1: Vector3, pos2: Vector3) {
+    const { minX, minY, minZ, maxX, maxY, maxZ } = getSelectionBounds(pos1, pos2, 0);
+
+    return location.x >= minX &&
+        location.x <= maxX &&
+        location.y >= minY &&
+        location.y <= maxY &&
+        location.z >= minZ &&
+        location.z <= maxZ;
 }
 
 export function isInside(locationChecking: Vector3, locations: Vector3[]) {
@@ -231,16 +295,31 @@ export function decompressLZW(compressed: string): string {
     return result;
 }
 
-export function getCurrentLevelName(player: ParkourPlayer): string | undefined {
-    const currentLevel = player.getDynamicProperty("currentLevel") as string ?? undefined
-    if (currentLevel && player.parkourLevel?.name != currentLevel) player.parkourLevel = getLevel(currentLevel);
-    return player.getDynamicProperty("currentLevel") as string ?? undefined;
+export function getPlayerLevel(player: ParkourPlayer) {
+    const levelName = dimensions.find((d) => d.typeId == player.dimension.id);
+    if (levelName) {
+        return getDimensionLevel(levelName)
+    }
+    return;
 }
+
+export function getDimensionLevel(dim: CustomDimension) {
+    const levelName = world.getDynamicProperty(`parkourDimension|${dim.typeId}`) as string;
+    if (levelName == undefined) return undefined;
+
+    return getLevel(levelName);
+}
+
+// export function getCurrentLevelName(player: ParkourPlayer): string | undefined {
+//     const currentLevel = player.getDynamicProperty("currentLevel") as string ?? undefined
+//     if (currentLevel && player.parkourLevel?.name != currentLevel) player.parkourLevel = getLevel(currentLevel);
+//     return player.getDynamicProperty("currentLevel") as string ?? undefined;
+// }
 
 export function createLevel(player: ParkourPlayer, name: string, description?: string) {
     const levelData: BaseLevel = {
         customLevelData: {
-            spawnLocation: { x: 0, y: -63, z: 0 },
+            spawn: { location: { x: 0, y: -63, z: 0 }, rotation: { x: 0, y: 0 } },
             endLocation: { x: 10, y: -63, z: 0 }
         },
         creator: player.name,
@@ -258,8 +337,12 @@ export function createLevel(player: ParkourPlayer, name: string, description?: s
     return levelData;
 }
 
+type DeepPartial<T> = {
+    [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
 interface CustomLevelDataUpdates {
-    spawnLocation?: Partial<Vector3>;
+    spawn?: DeepPartial<LocationRotation>;
     endLocation?: Partial<Vector3>;
     checkpoints?: Checkpoint[];
     deathZones?: DeathZone[];
@@ -286,9 +369,17 @@ export function saveLevel(player: ParkourPlayer, name: string, updates: LevelUpd
         customLevelData: {
             ...oldLevelData.customLevelData,
             ...updates.customLevelData,
-            spawnLocation: {
-                ...oldLevelData.customLevelData.spawnLocation,
-                ...updates.customLevelData?.spawnLocation,
+            spawn: {
+                ...(oldLevelData.customLevelData.spawn ?? {}),
+                ...(updates.customLevelData?.spawn ?? {}),
+                location: {
+                    ...(oldLevelData.customLevelData.spawn?.location ?? {}),
+                    ...(updates.customLevelData?.spawn?.location ?? {}),
+                },
+                rotation: {
+                    ...(oldLevelData.customLevelData.spawn?.rotation ?? {}),
+                    ...(updates.customLevelData?.spawn?.rotation ?? {}),
+                },
             },
 
             endLocation: {
@@ -311,9 +402,15 @@ export function saveLevel(player: ParkourPlayer, name: string, updates: LevelUpd
 
     world.setDynamicProperty(`parkourLevel|${levelName}|meta`, chunks.length);
 
-    player.parkourLevel = levelData;
+    updateLevel(player.dimension.id, levelData);
 
     return levelData;
+}
+
+export function updateLevel(dimension: string, level: Level) {
+    for (const player of (world.getPlayers().filter(p => p.dimension.id == dimension) as ParkourPlayer[])) {
+        player.parkourLevel = level
+    }
 }
 
 export function getDistance(location1: Vector3, location2: Vector3) {
@@ -356,6 +453,23 @@ export function getLevelNames(): string[] {
         .sort();
 }
 
+export function migrateLevel(level: Level): Level {
+    const data = level.customLevelData as any;
+
+    if (data == undefined) return level;
+
+    if (data.spawnLocation != undefined && data.spawn == undefined) {
+        data.spawn = {
+            location: data.spawnLocation,
+            rotation: { x: 0, y: 0 }
+        };
+    }
+
+    delete data.spawnLocation;
+
+    return level;
+}
+
 export function getLevel(name: string, player?: ParkourPlayer): Level | undefined {
     const levelMeta = world.getDynamicProperty(`parkourLevel|${name}|meta`) as number
     if (levelMeta == undefined) return;
@@ -367,7 +481,7 @@ export function getLevel(name: string, player?: ParkourPlayer): Level | undefine
     try {
         const level = JSON.parse(levelDataDecompressed) as Level
         if (player) player.parkourLevel = level
-        return level;
+        return migrateLevel(level);
     } catch { };
 }
 
@@ -387,14 +501,169 @@ export function runSaveStructure(dimension: Dimension, pos1: Vector3, pos2: Vect
     system.runJob(saveStructure(dimension, pos1, pos2, onProgress, onDone))
 }
 
+interface ItemData {
+    typeId: string;
+    props: {
+        amount: number,
+        keepOnDeath: boolean,
+        lockMode: ItemLockMode,
+        nameTag?: string
+    };
+    lore?: string[]
+    components: {
+        enchantable?: { type: string, level: number }[]
+        durability?: number
+    }
+}
+
+function saveInventory(player: ParkourPlayer) {
+    let { container, inventorySize } = player.getComponent("inventory")!;
+    const invName = player.id;
+    const items = [];
+    const listOfEquipmentSlots = [EquipmentSlot.Head, EquipmentSlot.Body, EquipmentSlot.Legs, EquipmentSlot.Feet, EquipmentSlot.Offhand];
+    let wornArmor = [];
+    for (let i = 0; i < listOfEquipmentSlots.length; i++) {
+        const equipment = player.getComponent("equippable")!.getEquipment(listOfEquipmentSlots[i]);
+        if (!equipment) {
+            wornArmor.push(null);
+            continue;
+        }
+        const data: ItemData = {
+            typeId: equipment.typeId,
+            props: {
+                amount: equipment.amount,
+                keepOnDeath: equipment.keepOnDeath,
+                lockMode: equipment.lockMode
+            },
+            lore: equipment.getLore(),
+            components: {}
+        };
+        if (equipment.nameTag) data.props.nameTag = equipment.nameTag;
+        if (equipment.getComponent("enchantable")?.isValid) {
+            data.components.enchantable = equipment.getComponent("enchantable")!.getEnchantments().map(e => ({ type: e.type.id, level: e.level }));
+        }
+        if (equipment.getComponent("durability")?.isValid) {
+            data.components.durability = equipment.getComponent("durability")!.damage;
+        }
+        wornArmor.push(data);
+    }
+    player.setDynamicProperty(`armor:${invName}`, JSON.stringify(wornArmor));
+
+    for (let i = 0; i < inventorySize; i++) {
+        const item = container.getItem(i);
+        if (!item) {
+            items.push(null);
+            continue;
+        }
+        const data: ItemData = {
+            typeId: item.typeId,
+            props: {
+                amount: item.amount,
+                keepOnDeath: item.keepOnDeath,
+                lockMode: item.lockMode
+            },
+            lore: item.getLore(),
+            components: {}
+        };
+        if (item.nameTag) data.props.nameTag = item.nameTag;
+        if (item.getComponent("enchantable")?.isValid) {
+            data.components.enchantable = item.getComponent("enchantable")!.getEnchantments().map(e => ({ type: e.type.id, level: e.level }));
+        }
+        if (item.getComponent("durability")?.isValid) {
+            data.components.durability = item.getComponent("durability")!.damage;
+        }
+        items.push(data);
+    }
+    player.setDynamicProperty(`inventory:${invName}`, JSON.stringify(items));
+    return { items, wornArmor };
+}
+
+function loadInventory(player: ParkourPlayer) {
+    let { container, inventorySize } = player.getComponent("inventory")!;
+    const invName = player.id;
+    const items = JSON.parse(player.getDynamicProperty(`inventory:${invName}`) as string ?? "[]") as ItemData[];
+    const wornArmor = JSON.parse(player.getDynamicProperty(`armor:${invName}`) as string ?? "[]") as ItemData[];
+    const listOfEquipmentSlots = [EquipmentSlot.Head, EquipmentSlot.Body, EquipmentSlot.Legs, EquipmentSlot.Feet, EquipmentSlot.Offhand];
+    for (let i = 0; i < listOfEquipmentSlots.length; i++) {
+        const equipment = player.getComponent("equippable")!
+        const data = wornArmor[i];
+        if (!data) {
+            container.setItem(i, undefined);
+        } else {
+            const item = new ItemStack(data.typeId);
+            for (const key in data.props) {
+                // @ts-ignore
+                item[key] = data.props[key];
+            }
+            item.setLore(data.lore);
+            if (data.components.enchantable) {
+                item.getComponent("enchantable")!.addEnchantments(data.components.enchantable.map(e => ({ ...e, type: new EnchantmentType(e.type) })));
+            }
+            if (data.components.durability) {
+                item.getComponent("durability")!.damage = data.components.durability;
+            }
+            equipment.setEquipment(listOfEquipmentSlots[i], item);
+        }
+    }
+    for (let i = 0; i < inventorySize; i++) {
+        const data = items[i];
+        if (!data) {
+            container.setItem(i, undefined);
+        } else {
+            const item = new ItemStack(data.typeId);
+            for (const key in data.props) {
+                // @ts-ignore
+                item[key] = data.props[key];
+            }
+            item.setLore(data.lore);
+            if (data.components.enchantable) {
+                item.getComponent("enchantable")!.addEnchantments(data.components.enchantable.map(e => ({ ...e, type: new EnchantmentType(e.type) })));
+            }
+            if (data.components.durability) {
+                item.getComponent("durability")!.damage = data.components.durability;
+            }
+            container.setItem(i, item);
+        }
+    }
+}
+
 export function playtestLevel(player: ParkourPlayer, level: Level) {
+    player.camera.fade({ fadeTime: { fadeInTime: 0, fadeOutTime: 0.1, holdTime: 0 } });
     player.setDynamicProperty("oldLocation", player.location);
     player.setDynamicProperty("oldRotation", { x: player.getRotation().x, y: player.getRotation().y, z: 0 });
     // save inv and stuff
+    saveInventory(player);
+    player.checkpoint = undefined;
+    player.isPlaytesting = true;
     player.runCommand("clear");
-    const spawnLocation = level.customLevelData.spawnLocation
-    player.teleport({ x: spawnLocation.x + 0.5, y: spawnLocation.y, z: spawnLocation.z + 0.5 });
+    player.runCommand("effect @s clear")
+    player.clearVelocity();
+    addItem(player, "minecraft:barrier", 1, 8, undefined, undefined, ItemLockMode.inventory);
+    const { x, y, z } = level.customLevelData.spawn.location
+    player.teleport({ x: x + 0.5, y: y, z: z + 0.5 }, { rotation: level.customLevelData.spawn.rotation });
     player.setGameMode(GameMode.Adventure);
+}
+
+export function returnToEditor(player: ParkourPlayer, level: Level) {
+    const loc = player.getDynamicProperty("oldLocation") as Vector3
+    player.camera.fade({ fadeTime: { fadeInTime: 0, fadeOutTime: 0.1, holdTime: 0 } });
+    player.isPlaytesting = false;
+    if (!player.isFlying && (player.dimension.getTopmostBlock(loc) ?? { y: -1000 }).y + 1 != Math.floor(loc.y)) {
+        const removeSlowFallingOnMovement = system.runInterval(() => {
+            player.applyKnockback({ x: 0, z: 0 }, 0.034);
+            if ((JSON.stringify(player.inputInfo.getMovementVector()) != JSON.stringify({ x: 0, y: 0 })) || player.isJumping || player.isSneaking) {
+                system.clearRun(removeSlowFallingOnMovement)
+            }
+        })
+
+        system.runTimeout(() => {
+            system.clearRun(removeSlowFallingOnMovement)
+        }, 500);
+    }
+    player.runCommand("clear");
+    loadInventory(player);
+    player.teleport(loc, { rotation: player.getDynamicProperty("oldRotation") as Vector2 });
+    player.setGameMode(GameMode.Creative);
 }
 
 export function* saveStructure(dimension: Dimension, pos1: Vector3, pos2: Vector3, onProgress?: (count: number, total: number) => void, onDone?: (structure: SavedStructure) => void): Generator<void, void, void> {
