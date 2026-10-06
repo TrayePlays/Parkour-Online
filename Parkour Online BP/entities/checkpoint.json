@@ -1,0 +1,42 @@
+{
+    "format_version": "1.26.0",
+    "minecraft:entity": {
+        "description": {
+            "identifier": "parkour:checkpoint",
+            "is_spawnable": false,
+            "is_summonable": true,
+            "is_experimental": false
+        },
+        "components": {
+            "minecraft:type_family": {
+                "family": [
+                    "inanimate",
+                    "actor"
+                ]
+            },
+            "minecraft:damage_sensor": {
+                "triggers": [
+                    {
+                        "cause": "all",
+                        "deals_damage": "no"
+                    }
+                ]
+            },
+            "minecraft:physics": {
+                "has_collision": false,
+                "has_gravity": false
+            },
+            "minecraft:fire_immune": {},
+            "minecraft:knockback_resistance": {
+                "value": 1,
+                "max": 1
+            },
+            "minecraft:body_rotation_blocked": {},
+            "minecraft:cannot_be_attacked": {},
+            "minecraft:collision_box": {
+                "height": 2,
+                "width": 1
+            }
+        }
+    }
+}

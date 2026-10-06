@@ -1,5 +1,6 @@
 import { BlockPermutation, MolangVariableMap, Player, system, world } from "@minecraft/server";
 import { ActionFormData, CustomForm, ObservableBoolean, ObservableNumber, ObservableString } from "@minecraft/server-ui"
+import { createAccount, login, saveOnline, signIn } from "online/account";
 import { ServerStatusResponse } from "api";
 import { findAvailableDimension, loadDimension } from "build";
 import { dimensions } from "dimensions";
@@ -14,7 +15,8 @@ import { DynamicActionUI } from "lib/ui";
 import { api } from "main";
 import { updateOutlines } from "outline";
 import { BlockSettings, SettingsElementType } from "settings";
-import { Checkpoint, createAccount, createLevel, DeathZone, deleteLevel, FirebaseResponse, generateLevelCode, getLevel, getLevelNames, getPlayerLevel, isInsideLevelArea, Level, login, metadataToArray, OnlineLevel, ParkourPlayer, playtestLevel, returnToEditor, runSaveStructure, saveLevel, saveStructure, signIn, sleep, ZoneType } from "utils";
+import { Checkpoint, createLevel, DeathZone, deleteLevel, FirebaseResponse, generateLevelCode, getLevel, getLevelNames, getPlayerLevel, isInsideLevelArea, Level, LEVEL_DIFFICULTIES, LevelMetadata, ParkourPlayer, playtestLevel, returnToEditor, runSaveStructure, saveLevel, sleep, ZoneType } from "utils";
+import { getOnlineLevels, OnlineLevelMetadata, OnlineLevelSearchOption } from "online/level";
 
 async function signUpUI(player: Player) {
     if (player.persistentId == "") return player.sendMessage(`You have to sign in to sign in.`);
@@ -154,7 +156,7 @@ function levelMainUI(player: ParkourPlayer, levelName?: string) {
     const buttonData: { title: ObservableString, cb: () => void, vis: ObservableBoolean, disabled: ObservableBoolean, spacerVis: ObservableBoolean, dividerVis: ObservableBoolean, tooltip: ObservableString }[] = [];
     const toggle1 = { title: new ObservableString("Remember Me"), toggled: new ObservableBoolean(false, { clientWritable: true }), vis: new ObservableBoolean(false), disabled: new ObservableBoolean(false), description: new ObservableString("") }
     let insideLevelsForm = false;
-
+    let onlineLevels: OnlineLevelMetadata[] = [];
     let activeLevels = getLevelNames();
 
     const findTextCB = (newText: string) => {
@@ -233,7 +235,7 @@ function levelMainUI(player: ParkourPlayer, levelName?: string) {
         button1.title.setData("Play")
         button1.vis.setData(true);
         button1.cb = () => {
-
+            onlineLevelsMenu();
         };
 
         const button2 = buttonData[1];
@@ -249,6 +251,151 @@ function levelMainUI(player: ParkourPlayer, levelName?: string) {
         button3.vis.setData(true);
         button3.cb = () => {
             myLevelsForm();
+        };
+    }
+
+    function onlineLevelsMenu() {
+        allButtonSet({ vis: false, disabled: false, dividerVis: false });
+        textField1.vis.setData(false);
+        label1.title.setData("Play Online");
+
+        const button1 = buttonData[0];
+        button1.title.setData("Search");
+        button1.vis.setData(true);
+        button1.cb = () => {
+            onlineSearchForm();
+        };
+
+        const button2 = buttonData[1];
+        button2.title.setData("Recent");
+        button2.vis.setData(true);
+        button2.cb = () => {
+            onlineLevelsForm(OnlineLevelSearchOption.Recent);
+        };
+
+        const button3 = buttonData[2];
+        button3.title.setData("Featured");
+        button3.vis.setData(true);
+        button3.cb = () => {
+            onlineLevelsForm(OnlineLevelSearchOption.Featured);
+        };
+
+        const button4 = buttonData[3];
+        button4.title.setData("Downloaded");
+        button4.vis.setData(true);
+        button4.cb = () => {
+            onlineLevelsForm(OnlineLevelSearchOption.Downloaded);
+        };
+
+        const button5 = buttonData[4];
+        button5.title.setData("Back");
+        button5.vis.setData(true);
+        button5.cb = () => {
+            initialForm();
+        };
+    }
+
+    async function onlineLevelsForm(option: OnlineLevelSearchOption, text?: string, levelList?: OnlineLevelMetadata[]) {
+        let levels;
+        if (levelList) levels = levelList;
+        else levels = await getOnlineLevels(player, option, text);
+        if (!levels) return;
+
+        allButtonSet({ vis: false, disabled: false, dividerVis: false });
+
+        label1.title.setData("yap");
+
+        const maxPage = Math.max(1, Math.ceil(levels.length / maxLevels));
+        page = Math.min(page, maxPage - 1);
+
+        const start = page * maxLevels;
+        const pageLevels = levels.slice(start, start + maxLevels);
+
+        pageLevels.forEach((level, i) => {
+            const button = buttonData[i];
+
+            button.title.setData(level.name);
+            button.vis.setData(true);
+            button.disabled.setData(false);
+            button.cb = () => {
+                // play/download level here
+                selectLevelForm(level, levels);
+                console.warn(`Selected online level: ${level.id}`);
+            };
+        });
+
+        if (maxPage > 1) {
+            if (page < maxPage - 1) {
+                buttonData[maxLevels].title.setData("Next");
+                buttonData[maxLevels].vis.setData(true);
+                buttonData[maxLevels].cb = () => {
+                    page++;
+                    onlineLevelsForm(option);
+                };
+            }
+
+            if (page > 0) {
+                buttonData[maxLevels + 1].title.setData("Previous");
+                buttonData[maxLevels + 1].vis.setData(true);
+                buttonData[maxLevels + 1].cb = () => {
+                    page--;
+                    onlineLevelsForm(option);
+                };
+            }
+        }
+
+        const backButton = buttonData[maxLevels + 2];
+        backButton.title.setData("Back");
+        backButton.vis.setData(true);
+        backButton.cb = () => {
+            onlineLevelsMenu();
+        };
+    }
+
+    async function selectLevelForm(level: OnlineLevelMetadata, levels: OnlineLevelMetadata[]) {
+        allButtonSet({ vis: false, disabled: false, dividerVis: false });
+        label1.title.setData(`${level.name} by ${level.creator}\n§7${level.description ? `\nDescription: ${level.description}` : ""}\nDifficulty: ${LEVEL_DIFFICULTIES[level.difficulty]}\nDownloads: ${level.downloads}\nLikes: ${level.likes}`);
+
+        const button1 = buttonData[0];
+        button1.title.setData("Download");
+        button1.vis.setData(true);
+        button1.cb = () => {
+            onlineSearchForm();
+        };
+
+        const button2 = buttonData[1];
+        button2.title.setData("Back");
+        button2.vis.setData(true);
+        button2.cb = () => {
+            // not actually choosing downloads forcing their old levels array
+            onlineLevelsForm(OnlineLevelSearchOption.Downloaded, undefined, levels);
+        };
+    }
+
+    async function onlineSearchForm() {
+        allButtonSet({ vis: false, disabled: false, dividerVis: false });
+
+        label1.title.setData("Search Online Levels");
+
+        textField1.title.setData("Search");
+        textField1.text.setData("");
+        textField1.description.setData("");
+        textField1.vis.setData(true);
+
+        const searchCB = (text: string) => {
+            if (text == "") return;
+
+            onlineLevelsForm(OnlineLevelSearchOption.Search, text);
+        };
+
+        textField1.text.subscribe(searchCB);
+
+        const backButton = buttonData[0];
+        backButton.title.setData("Back");
+        backButton.vis.setData(true);
+        backButton.cb = () => {
+            textField1.text.unsubscribe(searchCB);
+            onlineLevelsMenu();
         };
     }
 
@@ -452,44 +599,44 @@ function levelMainUI(player: ParkourPlayer, levelName?: string) {
         return loginInit(password);
     }
 
-    async function saveOnline(player: Player, level: Level) {
-        try {
-            label1.title.setData("Logging in...");
-            allButtonSet({ vis: false });
-            const account = await signIn(player);
-            if (!account) return editLevelForm(level.name);
-            label1.title.setData(`Posting ${level.name}...`);
-            // console.warn(JSON.stringify(login))
-            const levelCode = generateLevelCode();
-            const saveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/levels/${levelCode}.json?auth=${account.idToken}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ creator: level.creator, name: level.name, description: level.description, ownerId: account.localId }),
-            })
-            const dataSaveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/level_data/${levelCode}.json?auth=${account.idToken}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ structure: level.structure, levelData: level.customLevelData, ownerId: account.localId }),
-            })
-            if (dataSaveReq.status == ServerStatusResponse.Success) {
-                label1.title.setData(`Posted ${level.name}!`);
-                await sleep(30);
-                editLevelForm(level.name);
-            } else {
-                label1.title.setData(`Failed to upload ${level.name}...`);
-                await sleep(30);
-                editLevelForm(level.name);
-            }
-        } catch {
-            label1.title.setData(`Failed to upload ${level.name}...`);
-            await sleep(30);
-            editLevelForm(level.name);
-        }
-    }
+    // async function saveOnline(player: Player, level: Level) {
+    //     try {
+    //         label1.title.setData("Logging in...");
+    //         allButtonSet({ vis: false });
+    //         const account = await signIn(player);
+    //         if (!account) return editLevelForm(level.name);
+    //         label1.title.setData(`Posting ${level.name}...`);
+    //         // console.warn(JSON.stringify(login))
+    //         const levelCode = generateLevelCode();
+    //         const saveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/levels/${levelCode}.json?auth=${account.idToken}`, {
+    //             method: "PUT",
+    //             headers: {
+    //                 "Content-Type": "application/json",
+    //             },
+    //             body: JSON.stringify({ creator: level.creator, name: level.name, description: level.description, ownerId: account.localId }),
+    //         })
+    //         const dataSaveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/level_data/${levelCode}.json?auth=${account.idToken}`, {
+    //             method: "PUT",
+    //             headers: {
+    //                 "Content-Type": "application/json",
+    //             },
+    //             body: JSON.stringify({ structure: level.structure, levelData: level.customLevelData, ownerId: account.localId }),
+    //         })
+    //         if (dataSaveReq.status == ServerStatusResponse.Success) {
+    //             label1.title.setData(`Posted ${level.name}!`);
+    //             await sleep(30);
+    //             editLevelForm(level.name);
+    //         } else {
+    //             label1.title.setData(`Failed to upload ${level.name}...`);
+    //             await sleep(30);
+    //             editLevelForm(level.name);
+    //         }
+    //     } catch {
+    //         label1.title.setData(`Failed to upload ${level.name}...`);
+    //         await sleep(30);
+    //         editLevelForm(level.name);
+    //     }
+    // }
 
     function createForm() {
         allButtonSet({ vis: false });
@@ -581,18 +728,21 @@ async function scriptUI(player: Player) {
     form.show(player);
 }
 
-function scriptUI2(player: Player) {
-    const form = new DynamicActionUI(300, 200, { body_texture: "textures/ui/greyBorder", header_texture: "textures/ui/greyBorder" }, { height: 40, width: 300 }, { x: 0, y: 0 }, { autoCenter: true })
+async function scriptUI2(player: Player) {
+    const levels = await getOnlineLevels(player);
+    if (!levels) return;
+    const form = new DynamicActionUI(300, 180, { body_texture: "textures/ui/greyBorder", header_texture: "textures/ui/greyBorder" }, { height: 40, width: 300 }, { x: 0, y: 0 })
     form.title(new Label("Levels", { x: 0, y: 0 }, 3, "center", undefined, { fontType: "MinecraftTen" }));
-    const levelAmount = 20
+    const levelAmount = 10
     const buttonArr = [];
-    for (let i = 0; i < levelAmount; i++) {
+    for (let i = 0; i < levels.length; i++) {
+        const level = levels[i];
         buttonArr.push(
             new Button(
                 new ButtonPanel({ x: 10, y: 10 }, { height: 24, width: 276 }),
                 undefined,
                 // undefined,
-                new Label(`Level ${i + 1}`, { x: 15, y: 16 + (i * 24) }, 1, "left"),
+                new Label(`${level?.name ?? ""} ${level?.description ?? ""}${level ? "\nby " + level?.creator : ""}`, { x: 15, y: 12 + (i * 24) }, 1, "left"),
                 () => {
                     console.warn("hi");
                 },
@@ -601,7 +751,7 @@ function scriptUI2(player: Player) {
         )
     }
     form.customScrollingContentPanel(new ScrollingPanel({
-        height: 180, width: 300
+        height: 160, width: 300
     }, {
         x: 0, y: 10
     }))
@@ -738,6 +888,14 @@ export function spawnSettingsUI(player: Player, level: Level) {
 
 export function checkpointSettingsUI(player: ParkourPlayer, level: Level, checkpoint: Checkpoint) {
     const enterMessage = new ObservableBoolean(checkpoint.settings?.enterMessage != undefined)
+    const { x, y, z } = checkpoint.respawnLocation
+    const offsetSign = x < 0 ? -1 : 1;
+    let offsetX = (x % 1) * offsetSign;
+    let offsetY = y % 1;
+    let offsetZ = z % 1;
+    console.warn(parseFloat(offsetX.toFixed(1)) * 10);
+    const hasOffset = (checkpoint.respawnLocation.x % 1 != 0 || checkpoint.respawnLocation.y % 1 != 0 || checkpoint.respawnLocation.z % 1 != 0);
+    const offsetBool = new ObservableBoolean(hasOffset)
     const currentMessage = checkpoint.settings?.enterMessage ?? "";
 
     const closeDelete = new ObservableBoolean(false);
@@ -746,6 +904,61 @@ export function checkpointSettingsUI(player: ParkourPlayer, level: Level, checkp
 
     settingsUI(player, {
         elements: [
+
+            {
+                type: SettingsElementType.Toggle,
+                name: "Offset?",
+                default: offsetBool.getData(),
+                cb(value) {
+                    offsetBool.setData(value);
+
+                    if (!value) {
+                        const checkpoints = [...(level.customLevelData.checkpoints ?? [])];
+                        const checkpointIndex = checkpoints.indexOf(checkpoint);
+                        if (checkpointIndex == -1) return;
+
+                        const currentCheckpoint = checkpoints[checkpointIndex];
+
+                        currentCheckpoint.respawnLocation = {
+                            x: Math.floor(x),
+                            y: Math.floor(y),
+                            z: Math.floor(z)
+                        };
+
+                        saveLevel(player, level.name, {
+                            customLevelData: {
+                                checkpoints
+                            }
+                        });
+                    }
+                }
+            },
+            {
+                type: SettingsElementType.Slider,
+                name: "X Offset",
+                description: "5 » 0.5",
+                default: parseFloat(offsetX.toFixed(1)) * 10,
+                visible: offsetBool,
+                max: 5,
+                min: -5,
+                cb(value) {
+                    offsetX = value / 10;
+
+                    const checkpoints = [...(level.customLevelData.checkpoints ?? [])];
+                    const checkpointIndex = checkpoints.indexOf(checkpoint);
+                    if (checkpointIndex == -1) return;
+
+                    const currentCheckpoint = checkpoints[checkpointIndex];
+
+                    currentCheckpoint.respawnLocation.x = Math.floor(x) + 0.5 + (offsetX * offsetSign);
+
+                    saveLevel(player, level.name, {
+                        customLevelData: {
+                            checkpoints
+                        }
+                    });
+                },
+            },
             {
                 type: SettingsElementType.Toggle,
                 name: "Enter Message?",
@@ -904,16 +1117,16 @@ world.afterEvents.itemUse.subscribe(async ({ itemStack, source }) => {
     if (itemStack.typeId == "parkour:playtest") {
         playtestLevel(player, getPlayerLevel(player) ?? player.parkourLevel as Level);
     }
-    if (itemStack.typeId == "minecraft:barrier") {
+    if (itemStack.typeId == "parkour:stop") {
         returnToEditor(player, getPlayerLevel(player) ?? player.parkourLevel as Level)
     }
     if (itemStack.typeId == "minecraft:iron_ingot") vanillaUI(player);
     if (itemStack.typeId == "minecraft:raw_gold") {
         const data = await signIn(player);
         if (data == undefined) return;
-        const json = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/level/Doohickey1788753137818.json?auth=${data.idToken}`, {}, undefined, undefined, (c, total) => {
-            console.warn(`${c} / ${total}`);
-        })
+        // const json = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/level/Doohickey1788753137818.json?auth=${data.idToken}`, {}, undefined, undefined, (c, total) => {
+        // console.warn(`${c} / ${total}`);
+        // })
     }
     if (itemStack.typeId == "minecraft:diamond") {
         const molang = new MolangVariableMap();
@@ -921,5 +1134,8 @@ world.afterEvents.itemUse.subscribe(async ({ itemStack, source }) => {
         molang.setFloat("variable.lifetime", 1);
         molang.setFloat("variable.size", 0.5);
         player.dimension.spawnParticle("parkour:finish", { x: 0.5, y: -62.5, z: 0.5 }, molang);
+    }
+    if (itemStack.typeId == "minecraft:resin_brick") {
+        getOnlineLevels(player);
     }
 })

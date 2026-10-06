@@ -19,6 +19,15 @@
         },
         "play": {
             "textures": "textures/items/play"
+        },
+        "trash": {
+            "textures": "textures/items/trash"
+        },
+        "stop": {
+            "textures": "textures/items/stop"
+        },
+        "wand": {
+            "textures": "textures/items/wand"
         }
     }
 }

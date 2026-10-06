@@ -1,6 +1,6 @@
-import { GameMode, system, world } from "@minecraft/server";
+import { ButtonState, GameMode, InputButton, system, world } from "@minecraft/server";
 import { dimensions } from "dimensions";
-import { ZoneType, getSelectionBoundsMaxMin, isInside, isLocationInArea, Level, ParkourPlayer, getPlayerLevel, returnToEditor } from "utils";
+import { ZoneType, getSelectionBoundsMaxMin, isInside, isLocationInArea, Level, ParkourPlayer, getPlayerLevel, returnToEditor, verifyLevel } from "utils";
 
 system.run(() => {
     initialGetLevel();
@@ -18,9 +18,13 @@ function levelTick() {
         if (!player.parkourLevel) continue;
         if (player.getGameMode() != GameMode.Adventure) continue;
 
+        const { x, y } = player.inputInfo.getMovementVector();
+
+        player.onScreenDisplay.setActionBar(`§\u20A0  ${y > 0 ? "§a" : "§f"}W\n ${x > 0 ? "§a" : "§f"}A${y < 0 ? "§a" : "§f"}S${x < 0 ? "§a" : "§f"}D\n${player.inputInfo.getButtonState(InputButton.Jump) == ButtonState.Pressed ? "§a" : "§f"}SPACE`)
+
         const level = player.parkourLevel;
         const location = player.location
-        //respawnLocationing system
+
         if (player.location.y < -66) {
             respawnLocationPlayer(player, level)
             continue;
@@ -30,8 +34,8 @@ function levelTick() {
 
         const finish = level.customLevelData.endLocation;
 
-        if (isInside(location, getSelectionBoundsMaxMin(finish, finish, 1))) {
-            console.warn("finished level");
+        if (isInside(location, getSelectionBoundsMaxMin(finish, finish))) {
+            finishLevel(player, level);
         }
 
         const checkpoints = level.customLevelData.checkpoints ?? [];
@@ -61,7 +65,7 @@ function levelTick() {
                 if (isInside(location, getSelectionBoundsMaxMin(checkpoint.location, checkpoint.location, 1))) {
                     console.warn(`${player.name} entered checkpoint ${i}`);
                     if (checkpoint.settings?.enterMessage) {
-                        player.sendMessage(checkpoint.settings.enterMessage);
+                        player.onScreenDisplay.setActionBar(checkpoint.settings.enterMessage);
                     }
                     player.checkpoint = checkpoint.respawnLocation;
                     break;
@@ -97,6 +101,17 @@ world.afterEvents.playerGameModeChange.subscribe(({ player: source, toGameMode }
         returnToEditor(player, player.parkourLevel!);
     }
 })
+
+function finishLevel(player: ParkourPlayer, level: Level) {
+    const ticksToBeat = Math.max(system.currentTick - (player.startTime ?? 0), 1);
+    if (player.isPlaytesting) {
+        verifyLevel(player, level);
+        returnToEditor(player, level);
+        player.sendMessage(`§aLevel verified in ${(ticksToBeat / 20).toFixed(2)}s`);
+    } else {
+        // completeLevel(player, level);
+    }
+}
 
 function respawnLocationPlayer(player: ParkourPlayer, level: Level) {
     if (player.checkpoint) {

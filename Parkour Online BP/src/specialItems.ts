@@ -6,7 +6,7 @@ import { ZoneType, CustomLevelData, getCenter, getDistance, getLevel, getSelecti
 
 let specialDisplayItemsShow: ParkourPlayer[] = [];
 
-const specialItems = ["parkour:finish", "parkour:spawn", "parkour:checkpoint", "parkour:settings", "parkour:death", "parkour:playtest"];
+const specialItems = ["parkour:finish", "parkour:spawn", "parkour:checkpoint", "parkour:settings", "parkour:death", "parkour:playtest", "parkour:trash"];
 
 function checkSpecialItemDisplay(player: ParkourPlayer, itemStack?: ItemStack) {
     if (itemStack && specialItems.includes(itemStack.typeId)) {
@@ -39,9 +39,9 @@ function getSpecialBlock(player: ParkourPlayer) {
 
         for (const area of areas) {
             const { pos1, pos2, type } = area;
-            const {maxX, maxY, maxZ, minX, minY, minZ} = getSelectionBounds(pos1, pos2, 1);
-            const min = {x: minX, y: minY, z: minZ};
-            const max = {x: maxX, y: maxY, z: maxZ};
+            const { maxX, maxY, maxZ, minX, minY, minZ } = getSelectionBounds(pos1, pos2, 1);
+            const min = { x: minX, y: minY, z: minZ };
+            const max = { x: maxX, y: maxY, z: maxZ };
             if (isLocationInArea(newLocation, min, max)) {
                 // console.warn(`Looking at ${type} area ${system.currentTick % 20}`);
                 return area;
@@ -78,7 +78,7 @@ world.beforeEvents.playerPlaceBlock.subscribe((data) => {
         data.cancel = true;
     }
     if (item.typeId == "parkour:spawn") {
-        saveLevel(player, level.name, { customLevelData: { endLocation: level.customLevelData.endLocation, spawn: {location: block.location}, checkpoints: level.customLevelData.checkpoints } });
+        saveLevel(player, level.name, { customLevelData: { endLocation: level.customLevelData.endLocation, spawn: { location: block.location }, checkpoints: level.customLevelData.checkpoints } });
         data.cancel = true;
     }
     if (item.typeId == "parkour:checkpoint") {
@@ -131,18 +131,35 @@ world.beforeEvents.playerInteractWithBlock.subscribe((data) => {
     if (!isFirstEvent) return;
     const level = getPlayerLevel(player);
     if (!level) return;
+    if (itemStack?.typeId == "parkour:wand") {
+        if (player.zonePlacement?.position1 == undefined) {
+            player.zonePlacement = {
+                position1: block.location
+            };
+
+            system.run(() => {
+                player.sendMessage("Zone Position 1 Set");
+            });
+
+            data.cancel = true;
+            return;
+        }
+
+        const pos1 = player.zonePlacement.position1;
+        player.zonePlacement = undefined;
+
+        system.run(() => {
+            addDisplayOutline(player, OutlineTypes.Spawn, pos1, block.location);
+        })
+
+        data.cancel = true;
+        return;
+    }
     if (itemStack?.typeId == "parkour:settings") {
         if (JSON.stringify(block.above()?.location) == JSON.stringify(level.customLevelData.spawn)) {
             // console.warn("settings on spawn")
             system.run(() => spawnSettingsUI(player, level))
             return;
-        }
-        // console.warn(JSON.stringify(level.customLevelData.checkpoints))
-        for (const checkpoint of level.customLevelData.checkpoints?.filter(cp => Array.isArray(cp)) || []) {
-            // console.warn("checking checkpoint?")
-            if (isInside(block.above()!.location, [checkpoint[0], checkpoint[1]])) {
-                return console.warn("checkpoint big settings")
-            }
         }
         if (block.typeId == "parkour:checkpoint") {
             const checkpoint = level.customLevelData.checkpoints?.find(cp => cp.type == ZoneType.Point && JSON.stringify(cp.location) == JSON.stringify(block.location));
@@ -150,14 +167,35 @@ world.beforeEvents.playerInteractWithBlock.subscribe((data) => {
             system.run(() => checkpointSettingsUI(player, level, checkpoint));
         }
     }
+    if (itemStack?.typeId == "parkour:trash") {
+        if (block.typeId == "parkour:checkpoint") {
+            const checkpoint = level.customLevelData.checkpoints?.find(cp => cp.type == ZoneType.Point && JSON.stringify(cp.location) == JSON.stringify(block.location));
+            if (!checkpoint) return;
+            const checkpoints = [...(level.customLevelData.checkpoints ?? [])];
+            const checkpointIndex = checkpoints.indexOf(checkpoint);
+            if (checkpointIndex == -1) return;
+            checkpoints.splice(checkpointIndex, 1);
+
+            system.run(() => {
+                player.dimension.setBlockType(block.location, "air");
+                player.playSound("mob.breeze.hurt", { pitch: 2 })
+
+                saveLevel(player, level.name, {
+                    customLevelData: {
+                        checkpoints
+                    }
+                });
+            })
+        }
+    }
 })
 
 world.afterEvents.itemUse.subscribe(({ itemStack, source: player }) => {
     const level = getPlayerLevel(player);
     if (!level) return;
+    const area = getSpecialBlock(player);
+    if (!area) return;
     if (itemStack.typeId == "parkour:settings") {
-        const area = getSpecialBlock(player);
-        if (!area) return;
         if (area.type == OutlineTypes.Spawn) spawnSettingsUI(player, level);
         if (area.type == OutlineTypes.Checkpoint) {
             const checkpoint = level.customLevelData.checkpoints?.find(cp => cp.type == ZoneType.Area && JSON.stringify(cp.locations) == JSON.stringify([area.pos1, area.pos2]));
@@ -170,10 +208,46 @@ world.afterEvents.itemUse.subscribe(({ itemStack, source: player }) => {
             deathZoneSettingsUI(player, level, deathZone);
         }
     }
+    if (itemStack.typeId == "parkour:trash") {
+        if (area.type == OutlineTypes.Spawn || area.type == OutlineTypes.Finish) {
+            player.sendMessage(`You can't remove this!`)
+            return;
+        };
+        player.playSound("mob.breeze.hurt", { pitch: 2 })
+        if (area.type == OutlineTypes.Checkpoint) {
+            const checkpoint = level.customLevelData.checkpoints?.find(cp => cp.type == ZoneType.Area && JSON.stringify(cp.locations) == JSON.stringify([area.pos1, area.pos2]));
+            if (!checkpoint) return;
+
+            const checkpoints = [...(level.customLevelData.checkpoints ?? [])];
+            const checkpointIndex = checkpoints.indexOf(checkpoint);
+            if (checkpointIndex == -1) return;
+
+            checkpoints.splice(checkpointIndex, 1);
+
+            saveLevel(player, level.name, {
+                customLevelData: {
+                    checkpoints
+                }
+            });
+
+            updateOutlines(player.dimension.id);
+        }
+    }
 })
 
 function displayItemInterval() {
     for (const player of specialDisplayItemsShow) {
+        if (!player || !player.isValid) {
+            specialDisplayItemsShow.splice(specialDisplayItemsShow.indexOf(player), 1);
+            continue;
+        };
+        // const mo = new MolangVariableMap();
+        // mo.setFloat("variable.bsize_x", 1);
+        // mo.setFloat("variable.bsize_y", 1);
+        // mo.setFloat("variable.boffset_x", 0);
+        // mo.setFloat("variable.boffset_y", 0);
+        // mo.setFloat("variable.boffset_z", 0);
+        // player.dimension.spawnParticle("parkour:box", player.getHeadLocation(), mo);
         const level = getPlayerLevel(player);
         // maybe store level directly to the player
         if (level == undefined) return;
@@ -231,7 +305,7 @@ function displayItemInterval() {
                     molang.setFloat("variable.color.b", 1);
                     molang.setFloat("variable.color.a", 1);
                     // const { x, y, z } = checkpoint.respawnLocation
-                    const {x,y,z} = getCenter(pos1, pos2);
+                    const { x, y, z } = getCenter(pos1, pos2);
                     player.spawnParticle("parkour:death", { x: x + 0.5, y: y + 0.5, z: z + 0.5 }, molang);
                 } else {
                     molang.setFloat("variable.color.r", 1);
@@ -248,7 +322,7 @@ function displayItemInterval() {
         if (checkpoints) {
             for (const checkpoint of checkpoints) {
                 if (checkpoint.type == ZoneType.Point) {
-                    const location = checkpoint.location;
+                    const location = checkpoint.respawnLocation;
                     player.spawnParticle("parkour:checkpoint", { x: location.x + 0.5, y: location.y + 0.5, z: location.z + 0.5 }, molang);
                 } else if (checkpoint.type == ZoneType.Area) {
                     const [pos1, pos2] = checkpoint.locations;
@@ -419,6 +493,9 @@ function saveCustomLevelData(player: ParkourPlayer, levelName: string, data: Par
     });
 }
 
+
+
 system.runInterval(() => {
+    
     displayItemInterval();
 })

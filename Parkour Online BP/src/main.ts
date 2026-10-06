@@ -8,7 +8,7 @@ import "./specialItems.js"
 import "./ui.js"
 
 export const api = new HivemindAPI("ParkourOnline", { onConnect: onConnect });
-export const PARKOUR_VERSION = 0.01;
+export const PARKOUR_VERSION = 0.1;
 
 system.run(() => {
     world.sendMessage(`§8[§3Parkour Online§8] §eReloaded scripts §7(things may break)`);
@@ -23,7 +23,7 @@ async function onConnect() {
         const data = JSON.parse(updateReq.getData()) as { version: number };
         console.warn(updateReq.data)
         if (data.version > PARKOUR_VERSION) {
-            world.sendMessage(`\n§cThis version of Parkour Online is outdated, Update to play levels on the latest version! §7(/song:settings to disable message)`);
+            world.sendMessage(`\n§cThis version of Parkour Online is outdated, Update to play levels on the latest version! §7(/parkour:settings to disable message)`);
         }
     }
 }

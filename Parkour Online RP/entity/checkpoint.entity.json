@@ -1,0 +1,28 @@
+{
+    "format_version": "1.10.0",
+    "minecraft:client_entity": {
+        "description": {
+            "identifier": "parkour:checkpoint",
+            "geometry": {
+                "default": "geometry.checkpoint"
+            },
+            "textures": {
+                "default": "textures/models/checkpoint"
+            },
+            "materials": {
+                "default": "entity_alphatest"
+            },
+            "animations": {
+                "main": "controller.animation.checkpoint",
+                "idle": "animation.checkpoint.idle",
+                "spawn": "animation.checkpoint.spawn"
+            },
+            "scripts": {
+                "animate": ["main"]
+            },
+            "render_controllers": [
+                "controller.render.default"
+            ]
+        }
+    }
+}

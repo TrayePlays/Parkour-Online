@@ -50,7 +50,7 @@
                 },
                 "parkour:size_x": {
                     "client_sync": true,
-                    "default": 10.0,
+                    "default": 0.0,
                     "range": [
                         0.0,
                         200.0
@@ -59,7 +59,7 @@
                 },
                 "parkour:size_y": {
                     "client_sync": true,
-                    "default": 10.0,
+                    "default": 0.0,
                     "range": [
                         0.0,
                         200.0
@@ -68,7 +68,7 @@
                 },
                 "parkour:size_z": {
                     "client_sync": true,
-                    "default": 10.0,
+                    "default": 0.0,
                     "range": [
                         0.0,
                         200.0
@@ -104,8 +104,8 @@
             "minecraft:body_rotation_blocked": {},
             "minecraft:cannot_be_attacked": {},
             "minecraft:collision_box": {
-                "height": -100,
-                "width": -100
+                "height": 0,
+                "width": 0
             }
         }
     }

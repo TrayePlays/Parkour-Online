@@ -33,7 +33,7 @@ export function addDisplayOutline(player: ParkourPlayer, type: OutlineTypes, pos
 
     switch (type) {
         case OutlineTypes.Checkpoint:
-            color = { red: 0.2, green: 0.8, blue: 0, alpha }
+            color = { red: 0.28, green: 0.8, blue: 0.01, alpha }
             break;
         case OutlineTypes.Death:
             color = { red: 0.8, green: 0, blue: 0, alpha }
@@ -54,6 +54,7 @@ export function addDisplayOutline(player: ParkourPlayer, type: OutlineTypes, pos
     return outline;
 }
 
+// for not shown selection boxes
 export function addOutline(player: ParkourPlayer, type: OutlineTypes, pos1: Vector3, pos2: Vector3) {
     (player.displayOutlines ?? []).push({
         type,

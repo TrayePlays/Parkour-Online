@@ -1,0 +1,44 @@
+{
+	"format_version": "1.12.0",
+	"minecraft:geometry": [
+		{
+			"description": {
+				"identifier": "geometry.checkpoint",
+				"texture_width": 64,
+				"texture_height": 64,
+				"visible_bounds_width": 4,
+				"visible_bounds_height": 7,
+				"visible_bounds_offset": [0, 2.5, 0]
+			},
+			"bones": [
+				{
+					"name": "root",
+					"pivot": [0, 0, 0]
+				},
+				{
+					"name": "base",
+					"parent": "root",
+					"pivot": [0, 0, 0],
+					"cubes": [
+						{"origin": [-1, 4, -1.5], "size": [3, 18, 3], "uv": [0, 0]},
+						{"origin": [-2, 0, -2.5], "size": [5, 4, 5], "uv": [12, 20]},
+						{"origin": [-1, 20, -2.5], "size": [5, 5, 5], "pivot": [0.5, 23.5, 0], "rotation": [0, 0, 45], "uv": [12, 10]}
+					]
+				},
+				{
+					"name": "flag",
+					"parent": "base",
+					"pivot": [2, 38, 0]
+				},
+				{
+					"name": "lower",
+					"parent": "flag",
+					"pivot": [2, 32, 0],
+					"cubes": [
+						{"origin": [2, 10, 0], "size": [11, 10, 0], "uv": [12, 0]}
+					]
+				}
+			]
+		}
+	]
+}

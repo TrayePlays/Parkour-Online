@@ -4,10 +4,8 @@ import { ServerResponse, ServerStatusResponse } from "api";
 import { CustomDimension, dimensions } from "dimensions";
 import { api } from "main";
 
-export const API_KEY = "\u0041\u0049\u007A\u0061\u0053\u0079\u0043\u0051\u006C\u0036\u0032\u0041\u0078\u0061\u006E\u0042\u0036\u0069\u0052\u0052\u0032\u0063\u0078\u0054\u0051\u004E\u007A\u002D\u004D\u0073\u0074\u006B\u0066\u0069\u0045\u0030\u0046\u0045\u0051";
-export const EMAIL_HEADER = "@parkouronline.local";
-
-export let overworld: Dimension
+export let overworld: Dimension;
+export const DATABASE = "https://parkour-online-db-default-rtdb.firebaseio.com/"
 
 world.afterEvents.worldLoad.subscribe(() => {
     overworld = world.getDimension("overworld")
@@ -42,6 +40,8 @@ export class ParkourPlayer extends Player {
     displayOutlinesLoaded?: boolean;
     displayOutlines?: DisplayOutline[];
     isPlaytesting?: boolean
+    startTime?: number;
+    zonePlacement?: SpecialItemPlacement;
     deathZonePlacement?: SpecialItemPlacement
     checkpointPlacement?: SpecialItemPlacement;
     parkourLevel?: Level;
@@ -119,14 +119,9 @@ export interface CustomLevelData {
     deathZones?: DeathZone[]
 }
 
-export interface OnlineLevel extends Level {
-    creatorId: string;
-    difficulty: number;
-    version: number;
-}
-
 export interface Level extends BaseLevel {
     structure: SavedStructure;
+    verified: boolean;
 }
 
 export interface BaseLevel {
@@ -136,11 +131,22 @@ export interface BaseLevel {
     description?: string;
 }
 
-interface SavedStructure {
+export interface SavedStructure {
     size: Vector3;
     palette: string[];
     blocks: number[];
 }
+
+export const LEVEL_DIFFICULTIES = [
+    "Not Rated",
+    "Very Easy",
+    "Easy",
+    "Normal",
+    "Hard",
+    "Very Hard",
+    "Insane",
+    "Impossible"
+]
 
 export function formatTypeId(typeId: string) {
     if (typeId.includes("minecraft:")) {
@@ -355,6 +361,21 @@ interface LevelUpdates {
     customLevelData?: CustomLevelDataUpdates;
 }
 
+export function verifyLevel(player: ParkourPlayer, level: Level) {
+    level.verified = true;
+
+    const lzw = compressLZW(JSON.stringify(level));
+    const chunks = splitBytes(lzw);
+
+    chunks.forEach((chunk, i) => {
+        world.setDynamicProperty(`parkourLevel|${level.name}|${i}`, chunk);
+    });
+
+    world.setDynamicProperty(`parkourLevel|${level.name}|meta`, chunks.length);
+
+    updateLevel(player.dimension.id, level);
+}
+
 export function saveLevel(player: ParkourPlayer, name: string, updates: LevelUpdates) {
     const oldLevelData = getLevel(name);
     if (!oldLevelData) return;
@@ -366,6 +387,7 @@ export function saveLevel(player: ParkourPlayer, name: string, updates: LevelUpd
         name: levelName,
         description: updates.description ?? oldLevelData.description,
         structure: updates.structure ?? oldLevelData.structure,
+        verified: false,
         customLevelData: {
             ...oldLevelData.customLevelData,
             ...updates.customLevelData,
@@ -627,6 +649,23 @@ function loadInventory(player: ParkourPlayer) {
     }
 }
 
+export function _playLevel(player: ParkourPlayer, level: Level) {
+    player.camera.fade({ fadeTime: { fadeInTime: 0, fadeOutTime: 0.1, holdTime: 0 } });
+    player.setDynamicProperty("oldLocation", player.location);
+    player.setDynamicProperty("oldRotation", { x: player.getRotation().x, y: player.getRotation().y, z: 0 });
+    saveInventory(player);
+    player.checkpoint = undefined;
+    player.startTime = system.currentTick;
+    player.isPlaytesting = false;
+    player.runCommand("clear");
+    player.runCommand("effect @s clear");
+    player.clearVelocity();
+    addItem(player, "parkour:stop", 1, 8, undefined, undefined, ItemLockMode.inventory);
+    const { x, y, z } = level.customLevelData.spawn.location
+    player.teleport({ x: x + 0.5, y: y, z: z + 0.5 }, { rotation: level.customLevelData.spawn.rotation });
+    player.setGameMode(GameMode.Adventure);
+}
+
 export function playtestLevel(player: ParkourPlayer, level: Level) {
     player.camera.fade({ fadeTime: { fadeInTime: 0, fadeOutTime: 0.1, holdTime: 0 } });
     player.setDynamicProperty("oldLocation", player.location);
@@ -634,17 +673,19 @@ export function playtestLevel(player: ParkourPlayer, level: Level) {
     // save inv and stuff
     saveInventory(player);
     player.checkpoint = undefined;
+    player.startTime = system.currentTick;
     player.isPlaytesting = true;
     player.runCommand("clear");
     player.runCommand("effect @s clear")
     player.clearVelocity();
-    addItem(player, "minecraft:barrier", 1, 8, undefined, undefined, ItemLockMode.inventory);
+    addItem(player, "parkour:stop", 1, 8, undefined, undefined, ItemLockMode.inventory);
     const { x, y, z } = level.customLevelData.spawn.location
     player.teleport({ x: x + 0.5, y: y, z: z + 0.5 }, { rotation: level.customLevelData.spawn.rotation });
     player.setGameMode(GameMode.Adventure);
 }
 
 export function returnToEditor(player: ParkourPlayer, level: Level) {
+    if (!player.isPlaytesting) return;
     const loc = player.getDynamicProperty("oldLocation") as Vector3
     player.camera.fade({ fadeTime: { fadeInTime: 0, fadeOutTime: 0.1, holdTime: 0 } });
     player.isPlaytesting = false;
@@ -902,35 +943,6 @@ export function* loadStructure(structure: SavedStructure, dimension: Dimension, 
     if (onDone) onDone()
 }
 
-interface LoginData {
-    localId: string,
-    idToken: string
-}
-
-export async function signIn(player: Player): Promise<LoginData | undefined> {
-    const ping = await api.sendPingRequest();
-    if (ping.status != ServerStatusResponse.Success) {
-        player.sendMessage("You need to run /function connect")
-        return
-    };
-    let password = player.getDynamicProperty(`password`) as string;
-    if (!password) {
-        const prompt = await promptPassword(player);
-        if (!prompt) return;
-        password = prompt;
-    }
-    player.sendMessage(`Logging in...`)
-    const success = await login(player.name, password);
-    if (success?.localId != undefined) {
-        player.sendMessage(`Login success`)
-        return { localId: success.localId, idToken: success.idToken };
-    } else {
-        player.setDynamicProperty(`password`);
-        player.sendMessage(`Login fail: ${success}`);
-        signIn(player);
-    }
-}
-
 export function generateLevelCode(): string {
     const allowedChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const codeLength = 8;
@@ -956,137 +968,4 @@ export function metadataToArray(firebaseData: Record<string, any>): LevelMetadat
             ownerId: details.ownerId
         };
     });
-}
-
-
-export async function saveOnline(player: Player, level: Level) {
-    try {
-        const account = await signIn(player);
-        if (!account) return player.sendMessage(`Failed Login`);
-        // console.warn(JSON.stringify(login))
-        const levelCode = generateLevelCode();
-        console.warn("ran 1")
-        const saveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/levels/${levelCode}.json?auth=${account.idToken}`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ creator: level.creator, name: level.name, description: level.description, ownerId: account.localId }),
-        })
-        console.warn("ran 2")
-        const dataSaveReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/level_data/${levelCode}.json?auth=${account.idToken}`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ structure: level.structure, ownerId: account.localId }),
-        })
-        if (saveReq.status == ServerStatusResponse.Success) {
-            player.sendMessage(`Saved p1!`)
-        } else {
-            player.sendMessage(`Failed to save online!`)
-        }
-        if (dataSaveReq.status == ServerStatusResponse.Success) {
-            player.sendMessage(`Saved done!`)
-        } else {
-            player.sendMessage(`Failed to save online!`)
-        }
-    } catch {
-        player.sendMessage(`Failed to save online!`)
-    }
-}
-
-export async function createAccount(username: string, password: string): Promise<ServerResponse> {
-    const email = username + EMAIL_HEADER;
-
-    const response = await api.sendHttpRequest(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            email: email,
-            password: password,
-            returnSecureToken: true
-        })
-    });
-
-    if (response.status == ServerStatusResponse.Success) {
-        const data = response.getData();
-
-        if (data.error) {
-            console.warn(data.error.message);
-            return data;
-        }
-
-        console.warn(JSON.stringify(data));
-
-        console.warn("Created UID:", data.localId);
-        console.warn("Token:", data.idToken);
-        let success = false;
-        let attempts = 0;
-        while (!success) {
-            if (attempts < 10) break;
-            const userReq = await api.sendHttpRequest(`https://parkour-online-db-default-rtdb.firebaseio.com/users/${data.localId}.json?auth=${data.idToken}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    username
-                })
-            })
-            if (userReq.status == ServerStatusResponse.Success) {
-                success = true
-                break;
-            };
-            attempts++;
-            await sleep(10);
-        }
-
-        return data;
-    } else {
-        return response;
-    }
-}
-
-async function promptPassword(player: Player) {
-    let password = null as string | null;
-    const form = new ModalFormData();
-    form.title("Sign In");
-    form.textField("Password", "enter your password")
-    form.toggle(`Remember Me`, { defaultValue: false });
-    const { canceled, formValues } = await form.show(player);
-    if (canceled || formValues == undefined) return null;
-    password = formValues[0] as string;
-    if (formValues[1]) player.setDynamicProperty(`password`, password);
-    return password
-}
-
-export async function login(username: string, password: string) {
-    const email = username + EMAIL_HEADER;
-
-    const response = await api.sendHttpRequest(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            email: email,
-            password: password,
-            returnSecureToken: true
-        })
-    });
-    if (response.status == ServerStatusResponse.Success) {
-        const data = response.getData();
-
-        if (data.error) {
-            console.warn(data.error.message);
-            return;
-        }
-
-        console.warn("Logged in:", data.localId);
-
-        return data;
-    } else return response.data;
 }

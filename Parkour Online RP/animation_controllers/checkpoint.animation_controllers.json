@@ -1,0 +1,23 @@
+{
+    "format_version": "1.10.0",
+    "animation_controllers": {
+        "controller.animation.checkpoint": {
+            "initial_state": "spawn",
+            "states": {
+                "spawn": {
+                    "animations": ["spawn"],
+                    "blend_transition": 1,
+                    "transitions": [
+                        {
+                            "idle": "q.all_animations_finished"
+                        }
+                    ],
+                    "blend_via_shortest_path": true
+                },
+                "idle": {
+                    "animations": ["idle"]
+                }
+            }
+        } 
+    }
+}
